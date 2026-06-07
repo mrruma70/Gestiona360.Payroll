@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Services\CatalogApiService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="Pages\Catalogs\CatalogoCRUDManager.razor" />
+    <Content Remove="Pages\InactivityMonitor.razor" />
+    <Content Remove="Pages\Login.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.5" PrivateAssets="all" />
+    <PackageReference Include="MudBlazor" Version="8.5.1" />
+    <PackageReference Include="System.Net.Http.Json" Version="9.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gestiona360.Payroll.API.Contracts\Gestiona360.Payroll.API.Contracts.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Application.Contracts\Gestiona360.Payroll.Application.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\uploads\employees\" />
+  </ItemGroup>
+
+</Project>

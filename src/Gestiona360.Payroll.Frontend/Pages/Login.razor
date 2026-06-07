@@ -1,0 +1,161 @@
+﻿@page "/login"
+@layout LoginLayout
+@using FacturacionFacil.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService auth
+@inject NavigationManager nav
+@inject ISnackbar snack
+
+<PageTitle>Iniciar Sesión - Facturación Fácil</PageTitle>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+    }
+
+    .brand-section {
+        background: linear-gradient(rgba(145, 18, 56, 0.85), rgba(145, 18, 56, 0.95)), url('images/bg-login.jpg');
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 60px;
+        color: white;
+    }
+
+    .form-section {
+        background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+    }
+</style>
+
+<div class="login-container">
+    <MudGrid Spacing="0" Style="width: 100%; margin: 0;">
+        @* Lado Izquierdo: Branding (Inspirado en login.cshtml) *@
+        <MudItem xs="0" md="7" Class="brand-section d-none d-md-flex">
+            <MudImage Src="images/logologin.png" Width="180" Class="mb-6" />
+            <MudText Typo="Typo.h2" Style="font-weight: 800; line-height: 1.1;">
+                Facturación Fácil <br /> <span style="font-weight: 300; opacity: 0.8;">SAAS - ERP</span>
+            </MudText>
+            <MudDivider DividerType="DividerType.Middle" Class="my-6" Style="background-color: rgba(255,255,255,0.2); width: 100px; height: 3px;" />
+            <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 300;">
+                Movilidad y Control Total: Gestiona tu negocio <br /><b>estés donde estés.</b>
+            </MudText>
+            <MudText Typo="Typo.body1" Style="opacity: 0.7; max-width: 500px;">
+                Accede de forma segura a tus ventas, inventarios y reportes inteligentes desde cualquier dispositivo.
+            </MudText>
+        </MudItem>
+
+        @* Lado Derecho: Formulario *@
+        <MudItem xs="12" md="5" Class="form-section">
+            <div class="login-card">
+                <div class="d-flex justify-center mb-6 d-md-none">
+                    <MudImage Src="images/logo.png" Width="100" />
+                </div>
+
+                <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 700;">Bienvenidos</MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-8">Ingresa tus credenciales para continuar</MudText>
+
+                <MudPaper Elevation="0" Class="pa-4" Style="background: transparent;">
+                    <MudTextField @bind-Value="tenantCode"
+                                  Label="Empresa / Tenant"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  Class="mb-4"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Domain" />
+
+                    <MudTextField @bind-Value="email"
+                                  Label="Correo Electrónico"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  Class="mb-4"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email" />
+
+                    <MudTextField @bind-Value="password"
+                                  Label="Contraseña"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  FullWidth="true"
+                                  Class="mb-6"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Lock" />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Size="Size.Large"
+                               Disabled="@loading"
+                               OnClick="DoLogin"
+                               Style="height: 55px; font-weight: 700; font-size: 1.1rem; border-radius: 8px;">
+                        @if (loading)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ms-2">Procesando...</MudText>
+                        }
+                        else
+                        {
+                            <MudText>ENTRAR AL SISTEMA</MudText>
+                        }
+                    </MudButton>
+                </MudPaper>
+
+
+
+                <div class="mt-8 d-flex justify-center">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        &copy; 2026 Facturación Fácil - Todos los derechos reservados
+                    </MudText>
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private string tenantCode, email, password;
+    private bool loading = false;
+
+    private async Task DoLogin()
+    {
+        if (string.IsNullOrWhiteSpace(tenantCode) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            snack.Add("Todos los campos son obligatorios", Severity.Warning);
+            return;
+        }
+
+        loading = true;
+        try
+        {
+            var result = await auth.Login(tenantCode, email, password);
+            if (result.Success)
+            {
+                nav.NavigateTo("/", true);
+            }
+            else
+            {
+                snack.Add(result.Error, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snack.Add("Error inesperado: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

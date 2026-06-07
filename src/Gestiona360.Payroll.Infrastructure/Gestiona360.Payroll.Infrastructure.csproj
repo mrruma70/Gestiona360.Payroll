@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <None Remove="SqlQueries\BRANCHES_LIST.sql" />
+    <None Remove="SqlQueries\COMPANY_LEGAL_SHEET.sql" />
+    <None Remove="SqlQueries\DgiIrRetentionMonthly.sql" />
+    <None Remove="SqlQueries\EMPLOYEES_LIST.sql" />
+    <None Remove="SqlQueries\InatecMonthly.sql" />
+    <None Remove="SqlQueries\InssNominalMonthly.sql" />
+    <None Remove="SqlQueries\PayrollSummaryByBranch.sql" />
+    <None Remove="SqlQueries\PAYROLL_FREQUENCIES.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="SqlQueries\BRANCHES_LIST.sql" />
+    <EmbeddedResource Include="SqlQueries\COMPANY_LEGAL_SHEET.sql" />
+    <EmbeddedResource Include="SqlQueries\DgiIrRetentionMonthly.sql" />
+    <EmbeddedResource Include="SqlQueries\EMPLOYEES_LIST.sql" />
+    <EmbeddedResource Include="SqlQueries\InatecMonthly.sql" />
+    <EmbeddedResource Include="SqlQueries\InssNominalMonthly.sql" />
+    <EmbeddedResource Include="SqlQueries\PayrollSummaryByBranch.sql" />
+    <EmbeddedResource Include="SqlQueries\PAYROLL_FREQUENCIES.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="Dapper" Version="2.1.79" />
+    <PackageReference Include="Dapper.Contrib" Version="2.0.78" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.16" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.16">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="QuestPDF" Version="2026.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gestiona360.Payroll.Application.Contracts\Gestiona360.Payroll.Application.Contracts.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Domain\Gestiona360.Payroll.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

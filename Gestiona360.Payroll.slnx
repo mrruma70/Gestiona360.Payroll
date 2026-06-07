@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Gestiona360.Payroll.Application.Abstractions/Gestiona360.Payroll.Application.Abstractions.csproj" Id="4b6952a3-b12e-4995-872f-6cc0fdc28eab" />
+    <Project Path="src/Gestiona360.Payroll.API.Contracts/Gestiona360.Payroll.API.Contracts.csproj" />
+    <Project Path="src/Gestiona360.Payroll.API/Gestiona360.Payroll.API.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Application.Contracts/Gestiona360.Payroll.Application.Contracts.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Application/Gestiona360.Payroll.Application.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Domain.Shared/Gestiona360.Payroll.Domain.Shared.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Domain/Gestiona360.Payroll.Domain.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Frontend/Gestiona360.Payroll.Frontend.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Infrastructure.ExternalServices/Gestiona360.Payroll.Infrastructure.ExternalServices.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Infrastructure.Identity/Gestiona360.Payroll.Infrastructure.Identity.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Infrastructure.Persistence/Gestiona360.Payroll.Infrastructure.Persistence.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Infrastructure/Gestiona360.Payroll.Infrastructure.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Workers.BCNExchangeSync/Gestiona360.Payroll.Workers.BCNExchangeSync.csproj" />
+    <Project Path="src/Gestiona360.Payroll.Workers.PayrollClosing/Gestiona360.Payroll.Workers.PayrollClosing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gestiona360.Payroll.API.Tests/Gestiona360.Payroll.API.Tests.csproj" />
+    <Project Path="tests/Gestiona360.Payroll.Application.Tests/Gestiona360.Payroll.Application.Tests.csproj" />
+    <Project Path="tests/Gestiona360.Payroll.Domain.Tests/Gestiona360.Payroll.Domain.Tests.csproj" />
+    <Project Path="tests/Gestiona360.Payroll.Integration.Tests/Gestiona360.Payroll.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

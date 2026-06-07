@@ -1,0 +1,115 @@
+﻿@using MudBlazor
+
+<MudNavMenu Style="padding-top: 16px;">
+    <MudText Class="mx-4 mb-2" Style="color: #aaa; font-size: 0.75rem; letter-spacing: 1px;" Typo="Typo.caption">
+        MÓDULOS PRINCIPALES
+    </MudText>
+
+    <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Style="color: #e0e0e0;">
+        Dashboard
+    </MudNavLink>
+
+    @* ============================================ *@
+    @* 🏢 GESTIÓN DE EMPLEADORES *@
+    @* Ya incluye: Empresa + Sucursales + Configuración Global (INSS, IR, Salarios, BCN) *@
+    @* ============================================ *@
+    <MudNavGroup Title="Gestión de Empleadores" Icon="@Icons.Material.Filled.Apartment" Style="color: #e0e0e0;">
+        <MudNavLink Href="/employer-management" Match="NavLinkMatch.All">
+            Empresa, Sucursales y Parámetros
+        </MudNavLink>
+        <MudNavLink Href="/health-providers">Proveedores de Salud</MudNavLink>
+        <MudNavLink Href="/cost-centers">Centros de Costo</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* 👷 ESTRUCTURA LABORAL *@
+    @* ============================================ *@
+    <MudNavGroup Title="Estructura Laboral" Icon="@Icons.Material.Filled.AccountTree" Style="color: #e0e0e0;">
+        <MudNavLink Href="/catalogo/contract-types">Tipos de Contrato</MudNavLink>
+        <MudNavLink Href="/positions">Puestos y Niveles</MudNavLink>
+        <MudNavLink Href="/catalogo/occupational-risks">Riesgos Ocupacionales</MudNavLink>
+        <MudNavLink Href="/shifts">Turnos y Horarios</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* 👥 EMPLEADOS *@
+    @* ============================================ *@
+    <MudNavGroup Title="Empleados" Icon="@Icons.Material.Filled.People" Style="color: #e0e0e0;">
+        <MudNavLink Href="/employees">Listado de Empleados</MudNavLink>
+        <MudNavLink Href="/personal-actions" Icon="@Icons.Material.Filled.History">
+            Acciones de Personal
+        </MudNavLink>
+        <MudNavLink Href="/attendance">Control de Asistencia</MudNavLink>
+        <MudNavLink Href="/terminations">Finiquitos</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* 💰 NÓMINA *@
+    @* ============================================ *@
+    <MudNavGroup Title="Nómina" Icon="@Icons.Material.Filled.Receipt" Style="color: #e0e0e0;">
+        <MudNavLink Href="/payroll/groups">Grupos de Nómina</MudNavLink>
+        <MudNavLink Href="/payroll/periods">Períodos de Pago</MudNavLink>
+        <MudNavLink Href="/payroll/calculate">Calcular Nómina</MudNavLink>
+        <MudNavLink Href="/payroll/history">Historial de Nóminas</MudNavLink>
+        <MudNavLink Href="/payroll/incidents">Incidencias y Ajustes</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* 🎁 BENEFICIOS *@
+    @* ============================================ *@
+    <MudNavGroup Title="Beneficios" Icon="@Icons.Material.Filled.VolunteerActivism" Style="color: #e0e0e0;">
+        <MudNavLink Href="/benefits/vacations">Vacaciones</MudNavLink>
+        <MudNavLink Href="/benefits/aguinaldo">Aguinaldo</MudNavLink>
+        <MudNavLink Href="/benefits/indemnity">Indemnizaciones</MudNavLink>
+        <MudNavLink Href="/benefits/maternity">Maternidad</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* ⚖️ DEDUCCIONES Y PRÉSTAMOS *@
+    @* ============================================ *@
+    <MudNavGroup Title="Deducciones y Préstamos" Icon="@Icons.Material.Filled.MoneyOff" Style="color: #e0e0e0;">
+        <MudNavLink Href="/judicial/garnishments">Embargos Judiciales</MudNavLink>
+        <MudNavLink Href="/judicial/child-support">Pensión Alimenticia</MudNavLink>
+        <MudNavLink Href="/loans/corporate">Préstamos Corporativos</MudNavLink>
+        <MudNavLink Href="/loans/cooperatives">Cooperativas</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* 📊 CONTABILIDAD Y REPORTES *@
+    @* ============================================ *@
+    <MudNavGroup Title="Contabilidad y Reportes" Icon="@Icons.Material.Filled.Assessment" Style="color: #e0e0e0;">
+        <MudNavLink Href="/reports/payroll-slip">Colillas de Pago</MudNavLink>
+        <MudNavLink Href="/reports/inss">Reporte INSS</MudNavLink>
+        <MudNavLink Href="/reports/ir">Reporte IR (DGI)</MudNavLink>
+        <MudNavLink Href="/reports/inatec">Aporte INATEC</MudNavLink>
+        <MudNavLink Href="/reports/ach">Archivos ACH</MudNavLink>
+        <MudNavLink Href="/config/gl-accounts">Cuentas Contables (GL)</MudNavLink>
+    </MudNavGroup>
+
+    <MudDivider Class="my-4" Style="background-color: #2d2d2d;" />
+
+    @* ============================================ *@
+    @* 📋 CATÁLOGOS COMPLEMENTARIOS *@
+    @* SOLO lo que NO está en Configuración Global *@
+    @* ============================================ *@
+    <MudNavGroup Title="Catálogos Complementarios" Icon="@Icons.Material.Filled.List">
+        <MudNavLink Href="/catalogo/holiday-calendars">Feriados (Ley 1272)</MudNavLink>
+        <MudNavLink Href="/catalogo/payroll-frequencies">Frecuencias de Pago</MudNavLink>
+    </MudNavGroup>
+
+    @* ============================================ *@
+    @* ⚙️ CONFIGURACIÓN TÉCNICA *@
+    @* ============================================ *@
+    <MudNavGroup Title="Configuración Técnica" Icon="@Icons.Material.Filled.Settings" Style="color: #e0e0e0;">
+        <MudNavLink Href="/config/payroll-concepts">Conceptos de Nómina</MudNavLink>
+        <MudNavLink Href="/catalogo/banks">Bancos</MudNavLink>
+        <MudNavLink Href="/config/users">Usuarios y Roles</MudNavLink>
+        <MudNavLink Href="/config/audit-log">Bitácora de Auditoría</MudNavLink>
+    </MudNavGroup>
+
+    <MudDivider Class="my-4" Style="background-color: #2d2d2d;" />
+
+    <MudNavLink Href="/logout" Icon="@Icons.Material.Filled.Logout" Style="color: #e0e0e0;">
+        Cerrar Sesión
+    </MudNavLink>
+</MudNavMenu>

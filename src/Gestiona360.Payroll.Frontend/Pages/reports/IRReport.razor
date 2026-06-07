@@ -1,0 +1,235 @@
+﻿@page "/reports/ir"
+@using System.Text
+@using System.Globalization
+@using Microsoft.JSInterop
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudText Typo="Typo.h5" Class="mb-4">📊 Declaración Mensual de Retenciones IR (DMI)</MudText>
+
+<MudPaper Class="pa-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="int" Label="Año" @bind-Value="_selectedYear" Items="_availableYears" Variant="Variant.Outlined" Required="true">
+                @foreach (var year in _availableYears)
+                {
+                    <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="int" Label="Mes" @bind-Value="_selectedMonth" Variant="Variant.Outlined" Required="true">
+                <MudSelectItem T="int" Value="1">Enero</MudSelectItem>
+                <MudSelectItem T="int" Value="2">Febrero</MudSelectItem>
+                <MudSelectItem T="int" Value="3">Marzo</MudSelectItem>
+                <MudSelectItem T="int" Value="4">Abril</MudSelectItem>
+                <MudSelectItem T="int" Value="5">Mayo</MudSelectItem>
+                <MudSelectItem T="int" Value="6">Junio</MudSelectItem>
+                <MudSelectItem T="int" Value="7">Julio</MudSelectItem>
+                <MudSelectItem T="int" Value="8">Agosto</MudSelectItem>
+                <MudSelectItem T="int" Value="9">Septiembre</MudSelectItem>
+                <MudSelectItem T="int" Value="10">Octubre</MudSelectItem>
+                <MudSelectItem T="int" Value="11">Noviembre</MudSelectItem>
+                <MudSelectItem T="int" Value="12">Diciembre</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadData" Disabled="@_loading">
+                @if (_loading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span class="ml-2">Cargando...</span>
+                }
+                else
+                {
+                    <span>🔍 Consultar</span>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (_withholdingData != null && _withholdingData.Any())
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.subtitle1">Resultados del período @($"{_selectedMonth:00}/{_selectedYear}")</MudText>
+
+        <MudTable T="WithholdingDto" Items="@_withholdingData" Hover="true" Dense="true" Class="mt-3">
+            <HeaderContent>
+                <MudTh>Cédula</MudTh>
+                <MudTh>Empleado</MudTh>
+                <MudTh>Salario Bruto</MudTh>
+                <MudTh>INSS Laboral</MudTh>
+                <MudTh>Renta Neta</MudTh>
+                <MudTh>IR Retenido</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Cédula">@context.EmployeeId</MudTd>
+                <MudTd DataLabel="Empleado">@context.EmployeeName</MudTd>
+                <MudTd DataLabel="Salario Bruto">@context.GrossSalary.ToString("C2", CultureInfo.CreateSpecificCulture("es-NI"))</MudTd>
+                <MudTd DataLabel="INSS Laboral">@context.INSSWorker.ToString("C2", CultureInfo.CreateSpecificCulture("es-NI"))</MudTd>
+                <MudTd DataLabel="Renta Neta">@context.TaxableIncome.ToString("C2", CultureInfo.CreateSpecificCulture("es-NI"))</MudTd>
+                <MudTd DataLabel="IR Retenido">@context.IRWithheld.ToString("C2", CultureInfo.CreateSpecificCulture("es-NI"))</MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <div class="d-flex gap-2 mt-4 justify-end">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportExcel">
+                📑 Exportar Excel (DMI)
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCSV">
+                📄 Exportar CSV
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportXML">
+                🗂️ Exportar XML
+            </MudButton>
+        </div>
+    }
+    else if (_consulted && !_loading)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">No hay retenciones IR para el período seleccionado.</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private int _selectedYear = DateTime.UtcNow.Year;
+    private int _selectedMonth = DateTime.UtcNow.Month;
+    private List<WithholdingDto> _withholdingData = new();
+    private bool _loading = false;
+    private bool _consulted = false;
+
+    private List<int> _availableYears = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableYears();
+        if (_availableYears.Any())
+        {
+            _selectedYear = _availableYears.First(); // año más reciente
+            await LoadData();
+        }
+    }
+
+
+    private async Task LoadAvailableYears()
+    {
+        try
+        {
+            _availableYears = await Http.GetFromJsonAsync<List<int>>("api/reports/available-years") ?? new();
+            // Si no hay años, poner el actual como respaldo
+            if (!_availableYears.Any())
+            {
+                _availableYears.Add(DateTime.UtcNow.Year);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error cargando años: {ex.Message}", Severity.Warning);
+            _availableYears.Add(DateTime.UtcNow.Year);
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _consulted = true;
+        try
+        {
+            _withholdingData = await Http.GetFromJsonAsync<List<WithholdingDto>>($"api/reports/ir-withholding?year={_selectedYear}&month={_selectedMonth}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportExcel()
+    {
+        var response = await Http.GetAsync($"api/reports/ir-withholding/excel?year={_selectedYear}&month={_selectedMonth}");
+        if (response.IsSuccessStatusCode)
+        {
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await JS.InvokeVoidAsync("saveAsFile", $"Declaracion_IR_{_selectedYear}_{_selectedMonth:00}.xlsx", Convert.ToBase64String(bytes));
+            Snackbar.Add("Archivo Excel generado", Severity.Success);
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            Snackbar.Add($"Error: {error}", Severity.Error);
+        }
+    }
+
+    private async Task ExportCSV()
+    {
+        var csv = new StringBuilder();
+        csv.AppendLine("Año,Mes,Cédula,Empleado,Salario Bruto,INSS Laboral,Renta Neta,IR Retenido");
+        foreach (var item in _withholdingData)
+        {
+            csv.AppendLine($"{_selectedYear},{_selectedMonth},{item.EmployeeId},{item.EmployeeName},{item.GrossSalary.ToString(CultureInfo.InvariantCulture)},{item.INSSWorker.ToString(CultureInfo.InvariantCulture)},{item.TaxableIncome.ToString(CultureInfo.InvariantCulture)},{item.IRWithheld.ToString(CultureInfo.InvariantCulture)}");
+        }
+        var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+        await JS.InvokeVoidAsync("saveAsFile", $"Declaracion_IR_{_selectedYear}_{_selectedMonth:00}.csv", Convert.ToBase64String(bytes));
+        Snackbar.Add("Archivo CSV generado", Severity.Success);
+    }
+
+    private async Task ExportXML()
+    {
+        var xmlDoc = new System.Xml.XmlDocument();
+        var root = xmlDoc.CreateElement("DeclaracionRetencionesIR");
+        root.SetAttribute("Año", _selectedYear.ToString());
+        root.SetAttribute("Mes", _selectedMonth.ToString());
+        root.SetAttribute("Version", "1.0");
+        xmlDoc.AppendChild(root);
+
+        var empleadosNode = xmlDoc.CreateElement("Empleados");
+        root.AppendChild(empleadosNode);
+
+        foreach (var item in _withholdingData)
+        {
+            var empNode = xmlDoc.CreateElement("Empleado");
+            empNode.SetAttribute("Cedula", item.EmployeeId);
+            empNode.SetAttribute("Nombre", item.EmployeeName);
+
+            var salario = xmlDoc.CreateElement("SalarioBruto");
+            salario.InnerText = item.GrossSalary.ToString("F2", CultureInfo.InvariantCulture);
+            empNode.AppendChild(salario);
+
+            var inss = xmlDoc.CreateElement("INSSLaboral");
+            inss.InnerText = item.INSSWorker.ToString("F2", CultureInfo.InvariantCulture);
+            empNode.AppendChild(inss);
+
+            var renta = xmlDoc.CreateElement("RentaNeta");
+            renta.InnerText = item.TaxableIncome.ToString("F2", CultureInfo.InvariantCulture);
+            empNode.AppendChild(renta);
+
+            var ir = xmlDoc.CreateElement("IRRetenido");
+            ir.InnerText = item.IRWithheld.ToString("F2", CultureInfo.InvariantCulture);
+            empNode.AppendChild(ir);
+
+            empleadosNode.AppendChild(empNode);
+        }
+
+        var xmlString = xmlDoc.OuterXml;
+        var bytes = Encoding.UTF8.GetBytes(xmlString);
+        await JS.InvokeVoidAsync("saveAsFile", $"Declaracion_IR_{_selectedYear}_{_selectedMonth:00}.xml", Convert.ToBase64String(bytes));
+        Snackbar.Add("Archivo XML generado", Severity.Success);
+    }
+
+    // DTO interno (si no existe en la capa de aplicación)
+    public class WithholdingDto
+    {
+        public string EmployeeId { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+        public decimal GrossSalary { get; set; }
+        public decimal INSSWorker { get; set; }
+        public decimal TaxableIncome { get; set; }
+        public decimal IRWithheld { get; set; }
+    }
+}

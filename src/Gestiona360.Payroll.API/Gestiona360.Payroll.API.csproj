@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Controllers\CatalogsController.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="EPPlus" Version="8.6.0" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.16">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.16">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SqlKata" Version="4.0.1" />
+    <PackageReference Include="SqlKata.Execution" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gestiona360.Payroll.Application\Gestiona360.Payroll.Application.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Infrastructure.Persistence\Gestiona360.Payroll.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Infrastructure.Identity\Gestiona360.Payroll.Infrastructure.Identity.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Infrastructure.ExternalServices\Gestiona360.Payroll.Infrastructure.ExternalServices.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.API.Contracts\Gestiona360.Payroll.API.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestiona360 Payroll</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="Gestiona360.Payroll.Frontend.styles.css" rel="stylesheet" />
+
+    <style>
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:Roboto, sans-serif;">
+            <div style="border: 6px solid #e0e0e0; border-top: 6px solid #594ae2; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+            <span style="margin-top:20px; color:#616161;">Cargando módulos de nómina...</span>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Ha ocurrido un error inesperado.
+        <a href="." class="reload">Recargar</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <!-- 1. Librerías externas -->
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+    <!-- 2. TODAS tus funciones JavaScript personalizadas (SIN comentarios Razor) -->
+    <script>
+        // Función para guardar archivos desde Base64
+        window.saveAsFile = function (fileName, base64Content) {
+            var link = document.createElement('a');
+            link.download = fileName;
+            link.href = 'data:application/octet-stream;base64,' + base64Content;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // Función para descargar archivos desde Base64 (usada por el motor de reportes)
+        window.downloadFileFromBase64 = function (base64, contentType, fileName) {
+            try {
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: contentType });
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                setTimeout(function () { URL.revokeObjectURL(link.href); }, 100);
+            } catch (error) {
+                console.error('Error descargando archivo:', error);
+                alert('Error al descargar el archivo: ' + error.message);
+            }
+        };
+
+        // Función para abrir el selector de archivos
+        window.triggerFileInput = function (elementId) {
+            const input = document.getElementById(elementId);
+            if (input) {
+                input.click();
+            } else {
+                console.error('No se encontró el input con id: ' + elementId);
+            }
+        };
+
+        // Motor de descarga de reportes con autenticación
+        window.reportDownloader = {
+            downloadReport: async function (url, fileName) {
+                try {
+                    const token = localStorage.getItem('authToken');
+
+                    if (!token) {
+                        console.error('No se encontró token de autenticación');
+                        alert('Debe iniciar sesión para descargar reportes');
+                        return;
+                    }
+
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Accept': 'application/octet-stream'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            alert('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+                            window.location.href = '/Account/Login';
+                            return;
+                        }
+                        throw new Error('Error ' + response.status + ': ' + response.statusText);
+                    }
+
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = fileName || 'reporte.xlsx';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(downloadUrl);
+
+                } catch (error) {
+                    console.error('Error descargando reporte:', error);
+                    alert('Error al descargar el reporte: ' + error.message);
+                }
+            }
+        };
+    </script>
+
+    <!-- 3. Blazor WebAssembly (SIEMPRE al final) -->
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

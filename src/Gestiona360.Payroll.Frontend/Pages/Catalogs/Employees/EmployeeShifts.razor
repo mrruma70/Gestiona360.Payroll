@@ -1,0 +1,179 @@
+﻿@page "/employees/{id:guid}/shifts"
+@using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Turnos del Empleado | Gestiona360</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center align-center" style="height: 50vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_data != null)
+{
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div class="d-flex align-center">
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">Volver</MudButton>
+            <MudText Typo="Typo.h5" Class="ml-2">⏰ Turnos y Horarios</MudText>
+        </div>
+       
+    </div>
+      <MudChip T="string" Color="Color.Info">@_data.EmployeeCode - @_data.EmployeeName</MudChip>
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudText Typo="Typo.body2">
+            <strong>ℹ️ Nota:</strong> Esta vista es de <strong>solo consulta</strong>. Para asignar o modificar el turno de un empleado,
+            debe crear una <strong>"Acción de Personal"</strong> del tipo "Cambio de Turno".
+        </MudText>
+    </MudAlert>
+
+    <MudGrid>
+        <!-- SECCIÓN 1: TURNO ACTUAL -->
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">🟢 Turno Actual Asignado</MudText>
+
+                @if (_data.CurrentShift != null)
+                {
+                    <MudGrid Class="mb-4">
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Value="@_data.CurrentShift.ShiftName" Label="Nombre del Turno" ReadOnly="true" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Value="@_data.CurrentShift.ShiftType" Label="Tipo" ReadOnly="true" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Value="@_data.CurrentShift.StartDate.ToString("dd/MM/yyyy")" Label="Vigente desde" ReadOnly="true" Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">📅 Distribución Semanal</MudText>
+                    <MudTable Items="@_data.CurrentShift.Schedules" Hover="true" Dense="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Día</MudTh>
+                            <MudTh>Entrada</MudTh>
+                            <MudTh>Salida</MudTh>
+                            <MudTh>Estado</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Día">
+                                <MudText Typo="Typo.body2"><strong>@context.DayName</strong></MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Entrada">
+                                @(context.IsRestDay ? "--:--" : context.StartTime?.ToString(@"hh\:mm"))
+                            </MudTd>
+                            <MudTd DataLabel="Salida">
+                                @(context.IsRestDay ? "--:--" : context.EndTime?.ToString(@"hh\:mm"))
+                            </MudTd>
+                            <MudTd DataLabel="Estado">
+                                @if (context.IsRestDay)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">🛑 Descanso</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">✅ Laboral</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        Este empleado no tiene un turno activo asignado en este momento.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- SECCIÓN 2: HISTORIAL DE TURNOS -->
+        <MudItem xs="12" Class="mt-4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">📜 Historial de Asignaciones</MudText>
+
+                @if (_data.ShiftHistory.Any())
+                {
+                    <MudTable Items="@_data.ShiftHistory" Hover="true" Dense="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Turno</MudTh>
+                            <MudTh>Fecha Inicio</MudTh>
+                            <MudTh>Fecha Fin</MudTh>
+                            <MudTh>Origen / Acción</MudTh>
+                            <MudTh>Justificación</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Turno">
+                                <MudText Typo="Typo.body2"><strong>@context.ShiftName</strong></MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Inicio">
+                                @context.StartDate.ToString("dd/MM/yyyy")
+                            </MudTd>
+                            <MudTd DataLabel="Fin">
+                                @(context.EndDate?.ToString("dd/MM/yyyy") ?? "Actual")
+                            </MudTd>
+                            <MudTd DataLabel="Origen">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.ActionType</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Justificación">
+                                <MudText Typo="Typo.body2">@context.Justification</MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body1" Color="Color.Default" Class="pa-4 text-center">
+                        No hay historial de turnos registrado para este empleado.
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudAlert Severity="Severity.Error">No se pudo cargar la información de turnos.</MudAlert>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private EmployeeShiftsResultDto? _data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/employees/{Id}/shifts");
+            if (response.IsSuccessStatusCode)
+            {
+                _data = await response.Content.ReadFromJsonAsync<EmployeeShiftsResultDto>();
+            }
+            else
+            {
+                Snackbar.Add("❌ Error al cargar los turnos", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error de conexión: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo($"/employees/{Id}");
+}

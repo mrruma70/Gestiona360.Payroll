@@ -1,0 +1,542 @@
+﻿@page "/employees/new"
+@using Gestiona360.Payroll.Application.Contracts.DTOs
+@using Gestiona360.Payroll.Application.Contracts.Requests
+@using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<P ageTitle>Nuevo Empleado | Gestiona360</P>
+
+<MudText Typo="Typo.h5" Class="mb-4">🆕 Nuevo Registro de Empleado</MudText>
+
+<!-- STEPPER VISUAL -->
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudStepper Vertical="false" Linear="true">
+        <MudStep Title="Datos Básicos" Icon="@Icons.Material.Filled.Person"
+                 Style="@(_currentStep == 0 ? "color: var(--mud-palette-primary)" : "")">
+        </MudStep>
+        <MudStep Title="Contrato & Puesto" Icon="@Icons.Material.Filled.Work"
+                 Style="@(_currentStep == 1 ? "color: var(--mud-palette-primary)" : "")">
+        </MudStep>
+        <MudStep Title="Bancario" Icon="@Icons.Material.Filled.AccountBalance"
+                 Style="@(_currentStep == 2 ? "color: var(--mud-palette-primary)" : "")">
+        </MudStep>
+    </MudStepper>
+</MudPaper>
+
+<!-- CONTENIDO DEL PASO ACTUAL -->
+<MudPaper Class="pa-4" Elevation="1">
+
+    @* ============================================ *@
+    @* PASO 1: DATOS BÁSICOS *@
+    @* ============================================ *@
+    @if (_currentStep == 0)
+    {
+        <MudForm @ref="_step1Form">
+            <MudText Typo="Typo.h6" Class="mb-3">📋 Paso 1: Datos Básicos</MudText>
+            <MudDivider Class="mb-4" />
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Value="@_company?.LegalName" Label="🏢 Empresa"
+                                  Variant="Variant.Outlined" ReadOnly="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" @bind-Value="_model.BranchId" Label="🏙️ Sucursal *"
+                               Variant="Variant.Outlined" Required="true">
+                        @foreach (var branch in _branches)
+                        {
+                            <MudSelectItem T="Guid" Value="@branch.Id">@branch.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid?" @bind-Value="_model.CostCenterId"
+                               Label="🏢 Centro de Costo"
+                               Variant="Variant.Outlined"
+                               Clearable="true">
+                        <MudSelectItem T="Guid?" Value="null">Sin asignar</MudSelectItem>
+                        @foreach (var cc in _costCenters)
+                        {
+                            <MudSelectItem T="Guid?" Value="@cc.Id">@cc.Code - @cc.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Identification"
+                                  Label="🆔 Cédula *"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Validation="@(new Func<string, string?>(ValidateCedula))"
+                                  Immediate="true"
+                                  OnBlur="@AutoFillINSS" />
+                </MudItem>
+                @* <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Identification" Label="🆔 Cédula *"
+                                  Variant="Variant.Outlined" Required="true"
+                                  Validation="@(new Func<string, string?>(ValidateCedula))"
+                                  Immediate="true" />
+                </MudItem> *@
+                @* ✅ NUEVOS CAMPOS FISCALES *@
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.NOINSS" Label="🏥 Número INSS *"
+                                  Variant="Variant.Outlined" Required="true"
+                                  HelperText="Obligatorio - Ley 539"
+                                  Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.NORUC" Label="📝 Número RUC"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Opcional - Solo si aplica"
+                                  Immediate="true" />
+                </MudItem>
+                @* ==================================== *@
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_hireDate" Label="📅 Fecha de Ingreso *"
+                                   Variant="Variant.Outlined" Required="true"
+                                   MinDate="DateTime.Today" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.FirstName" Label="👤 Nombres *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.LastName" Label="👤 Apellidos *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Email" Label="📧 Correo *"
+                                  Variant="Variant.Outlined" Required="true"
+                                  Validation="@(new Func<string, string?>(ValidateEmail))" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_model.Phone" Label="📱 Teléfono *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    }
+
+    @* ============================================ *@
+    @* PASO 2: CONTRATO & PUESTO *@
+    @* ============================================ *@
+    @if (_currentStep == 1)
+    {
+        <MudForm @ref="_step2Form">
+            <MudText Typo="Typo.h6" Class="mb-3">📜 Paso 2: Contrato & Puesto</MudText>
+            <MudDivider Class="mb-4" />
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Value="_model.ContractTypeId"
+                               ValueChanged="@(v => OnContractTypeChanged(v))"
+                               Label="📄 Tipo Contrato *"
+                               Variant="Variant.Outlined" Required="true">
+                        @foreach (var ct in _contractTypes)
+                        {
+                            <MudSelectItem T="int" Value="@ct.Id">@ct.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" Value="_model.JobGradeId"
+                               ValueChanged="@(v => OnJobGradeChanged(v))"
+                               Label="👔 Puesto / Nivel *"
+                               Variant="Variant.Outlined" Required="true">
+                        @foreach (var grade in _jobGrades)
+                        {
+                            <MudSelectItem T="Guid" Value="@grade.Id">
+                                @grade.JobPositionName - @grade.Name
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Value="_model.BaseSalary"
+                                     ValueChanged="@((decimal v) => OnSalaryChanged(v))"
+                                     Label="💰 Salario Base (C$) *"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     Min="0m"
+                                     Step="100m"
+                                     Format="N2"
+                                     Immediate="true" />
+                </MudItem>
+              
+
+                @if (_showMinSalaryWarning)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Error" Dense="true">
+                            ⛔ El salario debe ser ≥ C$ @_minSalaryRequired.ToString("N2") (mínimo legal del sector)
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid?" @bind-Value="_model.HealthProviderId"
+                               Label="🏥 Proveedor Salud" Variant="Variant.Outlined">
+                        <MudSelectItem T="Guid?" Value="null">Sin proveedor</MudSelectItem>
+                        @foreach (var hp in _healthProviders)
+                        {
+                            <MudSelectItem T="Guid?" Value="@hp.Id">@hp.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <!-- FLAGS AUTOMÁTICOS -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">⚙️ Reglas Automáticas (Según Tipo de Contrato)</MudText>
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudGrid>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@(_selectedContractType?.ApplyINSS ?? false)"
+                                             Label="INSS" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@(_selectedContractType?.ApplyIR ?? false)"
+                                             Label="IR" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@(_selectedContractType?.ApplyINATEC ?? false)"
+                                             Label="INATEC" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@((_selectedContractType?.ApplyVacationsDays ?? 0) > 0)"
+                                             Label="Vacaciones" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@(_selectedContractType?.ApplyThirteenthMonth ?? false)"
+                                             Label="Aguinaldo" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                            <MudItem xs="6" sm="4">
+                                <MudCheckBox T="bool" Value="@(_selectedContractType?.ApplyIndemnity ?? false)"
+                                             Label="Indemnización" ReadOnly="true" Color="Color.Success" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    }
+
+    @* ============================================ *@
+    @* PASO 3: BANCARIO & RESUMEN *@
+    @* ============================================ *@
+    @if (_currentStep == 2)
+    {
+        <MudText Typo="Typo.h6" Class="mb-3">💳 Paso 3: Datos Bancarios</MudText>
+        <MudDivider Class="mb-4" />
+
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" @bind-Value="_model.BankId" Label="🏦 Banco" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="null">Sin cuenta</MudSelectItem>
+                    @foreach (var bank in _banks)
+                    {
+                        <MudSelectItem T="int?" Value="@bank.Id">@bank.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="string" @bind-Value="_model.BankAccountType" Label="💳 Tipo Cuenta" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("")">N/A</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Ahorro")">Ahorro</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Corriente")">Corriente</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_model.BankAccountNumber" Label="🔢 Número Cuenta"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
+                    💡 <strong>Nota:</strong> Las deducciones especiales (préstamos, embargos) se configuran
+                    después de la contratación mediante <strong>Acciones de Personal</strong>.
+                </MudAlert>
+            </MudItem>
+
+            <!-- RESUMEN FINAL -->
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mt-4">📋 Resumen de Contratación</MudText>
+                <MudPaper Elevation="2" Class="pa-4 mt-2">
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>👤 Empleado:</strong> @_model.FirstName @_model.LastName</MudText>
+                            <MudText><strong>🆔 Cédula:</strong> @_model.Identification</MudText>
+                            <MudText><strong>📅 Ingreso:</strong> @_hireDate?.ToString("dd/MM/yyyy")</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>👔 Puesto:</strong> @(_selectedJobGrade?.Name ?? "N/A")</MudText>
+                            <MudText><strong>💰 Salario:</strong> C$ @_model.BaseSalary.ToString("N2")</MudText>
+                            <MudText><strong>🏙️ Sucursal:</strong> @(_selectedBranch?.Name ?? "N/A")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+</MudPaper>
+
+<!-- BOTONES DE NAVEGACIÓN -->
+<div class="d-flex justify-space-between mt-4">
+    <MudButton Variant="Variant.Outlined" OnClick="Cancel">Cancelar</MudButton>
+
+    <div class="d-flex gap-2">
+        @if (_currentStep > 0)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="PreviousStep">
+                Anterior
+            </MudButton>
+        }
+
+        @if (_currentStep < 2)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                       OnClick="NextStep" Disabled="@_isValidating">
+                Siguiente
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success"
+                       EndIcon="@Icons.Material.Filled.Save"
+                       OnClick="SubmitAsync" Disabled="@_isSubmitting">
+                @if (_isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Creando...</span>
+                }
+                else
+                {
+                    <span>🚀 Crear Empleado</span>
+                }
+            </MudButton>
+        }
+    </div>
+</div>
+
+@code {
+    private int _currentStep = 0;
+    private bool _isSubmitting = false;
+    private bool _isValidating = false;
+    private bool _showMinSalaryWarning = false;
+    private decimal _minSalaryRequired = 0;
+
+    private MudForm? _step1Form;
+    private MudForm? _step2Form;
+
+    // ✅ Variable intermedia para el DatePicker (DateTime? nullable)
+    private DateTime? _hireDate = DateTime.Today;
+
+    private CreateEmployeeRequest _model = new();
+    private CompanyDto? _company;
+    private List<BranchDto> _branches = new();
+    private List<ContractTypeDto> _contractTypes = new();
+    private List<JobGradeDto> _jobGrades = new();
+    private List<HealthProviderDto> _healthProviders = new();
+    private List<BankDto> _banks = new();
+
+    private ContractTypeDto? _selectedContractType;
+    private JobGradeDto? _selectedJobGrade;
+    private BranchDto? _selectedBranch;
+    private List<CostCenterDto> _costCenters = new();
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _company = await Http.GetFromJsonAsync<CompanyDto>("api/companies/main");
+            _model.CompanyId = _company?.Id ?? Guid.Empty;
+
+            _branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/branches/active") ?? new();
+            _contractTypes = await Http.GetFromJsonAsync<List<ContractTypeDto>>("api/contracttypes/all") ?? new();
+            _jobGrades = await Http.GetFromJsonAsync<List<JobGradeDto>>("api/jobgrades/active") ?? new();
+            _healthProviders = await Http.GetFromJsonAsync<List<HealthProviderDto>>("api/healthproviders/active") ?? new();
+            _banks = await Http.GetFromJsonAsync<List<BankDto>>("api/banks/active") ?? new();
+            _costCenters = await Http.GetFromJsonAsync<List<CostCenterDto>>("api/costcenters/active") ?? new();
+
+            // Seleccionar primer contrato por defecto
+            if (_contractTypes.Any())
+            {
+                _model.ContractTypeId = _contractTypes.First().Id;
+                _selectedContractType = _contractTypes.First();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error cargando datos: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task NextStep()
+    {
+        _isValidating = true;
+        StateHasChanged();
+
+        bool isValid = false;
+
+        if (_currentStep == 0)
+        {
+            if (_step1Form != null)
+            {
+                await _step1Form.Validate();
+                isValid = _step1Form.IsValid && _hireDate.HasValue;
+
+                // ✅ Sincronizar la fecha al modelo antes de avanzar
+                if (_hireDate.HasValue)
+                {
+                    _model.HireDate = _hireDate.Value;
+                }
+            }
+        }
+        else if (_currentStep == 1)
+        {
+            if (_step2Form != null)
+            {
+                await _step2Form.Validate();
+                isValid = _step2Form.IsValid && !_showMinSalaryWarning;
+
+                if (_showMinSalaryWarning)
+                {
+                    Snackbar.Add("⚠️ El salario debe ser mayor o igual al mínimo legal", Severity.Warning);
+                }
+            }
+        }
+
+        if (isValid)
+        {
+            _currentStep++;
+
+            // Actualizar sucursal seleccionada al entrar al paso 3
+            if (_currentStep == 2)
+            {
+                _selectedBranch = _branches.FirstOrDefault(b => b.Id == _model.BranchId);
+            }
+        }
+        else
+        {
+            Snackbar.Add("⚠️ Complete todos los campos requeridos correctamente", Severity.Warning);
+        }
+
+        _isValidating = false;
+        StateHasChanged();
+    }
+
+    private void PreviousStep()
+    {
+        if (_currentStep > 0)
+        {
+            _currentStep--;
+            StateHasChanged();
+        }
+    }
+
+    private void OnContractTypeChanged(int contractTypeId)
+    {
+        _selectedContractType = _contractTypes.FirstOrDefault(ct => ct.Id == contractTypeId);
+        _model.ContractTypeId = contractTypeId;
+        StateHasChanged();
+    }
+
+    private void OnJobGradeChanged(Guid jobGradeId)
+    {
+        _selectedJobGrade = _jobGrades.FirstOrDefault(jg => jg.Id == jobGradeId);
+        _model.JobGradeId = jobGradeId;
+
+        if (_selectedJobGrade != null)
+        {
+            _minSalaryRequired = _selectedJobGrade.MinWageNIO;
+            ValidateMinSalary(_model.BaseSalary);
+        }
+        StateHasChanged();
+    }
+
+    private void ValidateMinSalary(decimal salary)
+    {
+        _showMinSalaryWarning = salary < _minSalaryRequired && _minSalaryRequired > 0;
+    }
+
+    private string ValidateCedula(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "La cédula es requerida";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{3}-\d{6}-\d{4}[A-Z0-9]$"))
+            return "Formato inválido (XXX-XXXXXX-XXXXX)";
+        return null;
+    }
+
+    private string ValidateEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "El correo es requerido";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            return "Correo inválido";
+        return null;
+    }
+
+    private void OnSalaryChanged(decimal value)
+    {
+        _model.BaseSalary = value;
+        ValidateMinSalary(value);  // ✅ Revalida cada vez que cambia el salario
+        StateHasChanged();
+    }
+
+    private async Task SubmitAsync()
+    {
+        _isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            // Asegurar que la fecha esté sincronizada
+            if (_hireDate.HasValue)
+            {
+                _model.HireDate = _hireDate.Value;
+            }
+
+            var response = await Http.PostAsJsonAsync("api/employees", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("✅ Empleado creado exitosamente", Severity.Success);
+                Navigation.NavigateTo("/employees");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"❌ Error: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AutoFillINSS()
+    {
+        // ✅ Auto-rellenar INSS con la cédula si está vacío
+        if (string.IsNullOrWhiteSpace(_model.NOINSS) &&
+            !string.IsNullOrWhiteSpace(_model.Identification))
+        {
+            _model.NOINSS = _model.Identification;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo("/employees");
+}

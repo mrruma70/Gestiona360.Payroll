@@ -1,0 +1,87 @@
+﻿@using FacturacionFacil.Client.Services
+@using System.Threading
+@implements IDisposable
+@inject AuthService AuthService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+@inject AppState AppState
+@inject IDialogService DialogService
+
+@code {
+    [Parameter] public int TimeoutMinutes { get; set; } = 30;
+
+    private DotNetObjectReference<InactivityMonitor>? _objRef;
+    private bool _isWarningDialogOpen = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            try
+            {
+                // Eliminamos el Delay innecesario que causa race conditions
+                await JSRuntime.InvokeVoidAsync("setupInactivityMonitor", _objRef, TimeoutMinutes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error inicializando monitor: {ex.Message}");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTimeoutReached()
+    {
+        // 1. EL SEGURO: Usamos 'AppState' (inyectado arriba)
+        if (AppState.IsFacturando)
+        {
+            await JSRuntime.InvokeVoidAsync("resetInactivityTimer");
+            return;
+        }
+
+        if (_isWarningDialogOpen) return;
+
+        // 2. AVISO PREVIO
+        _isWarningDialogOpen = true;
+
+        // CORRECCIÓN: Usamos BackdropClick en lugar de DisableBackdropClick
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = false,
+            BackdropClick = false
+        };
+
+        var parameters = new DialogParameters { { "TimeoutSeconds", 60 } };
+
+        // Asegúrate de que el componente 'SessionWarningDialog' exista en tu proyecto
+        var dialog = await DialogService.ShowAsync<SessionWarningDialog>("¿Sigues ahí?", parameters, options);
+        var result = await dialog.Result;
+
+        _isWarningDialogOpen = false;
+
+        if (result.Canceled)
+        {
+            // El usuario no respondió o cerró el diálogo sin confirmar
+            await AuthService.Logout();
+            NavManager.NavigateTo("/login");
+        }
+        else
+        {
+            // El usuario confirmó que sigue ahí
+            await JSRuntime.InvokeVoidAsync("resetInactivityTimer");
+        }
+    }
+
+    public async void Dispose()
+    {
+
+        try
+        {
+            // Notificamos a JS que detenga los timers ANTES de disponer el objeto
+            await JSRuntime.InvokeVoidAsync("destroyInactivityMonitor");
+        }
+        catch { /* Evitar errores si JS ya no está disponible */ }
+        _objRef?.Dispose();
+    }
+}

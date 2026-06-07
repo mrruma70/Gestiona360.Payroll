@@ -1,0 +1,208 @@
+﻿@page "/employees/{id:guid}/concepts"
+@using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Conceptos del Empleado | Gestiona360</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center align-center" style="height: 50vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_data != null)
+{
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div class="d-flex align-center">
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">Volver</MudButton>
+            <MudText Typo="Typo.h5" Class="ml-2">💰 Conceptos y Deducciones</MudText>
+        </div>
+     
+    </div>
+    <MudChip T="string" Color="Color.Info">@_data.EmployeeCode - @_data.EmployeeName</MudChip>
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudText Typo="Typo.body2">
+            <strong>ℹ️ Nota:</strong> Esta vista es de <strong>solo consulta</strong>. Para asignar, modificar, reprogramar o cancelar conceptos recurrentes,
+            utilice el módulo de <strong>"Acciones de Personal"</strong> (Tipo: Asignación de Concepto).
+        </MudText>
+    </MudAlert>
+
+    <MudGrid>
+        <!-- SECCIÓN 1: CONCEPTOS RECURRENTES -->
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">📋 Conceptos Recurrentes (Préstamos, Bonos, Deducciones)</MudText>
+
+                @if (!_data.Concepts.Any())
+                {
+                    <MudText Typo="Typo.body1" Color="Color.Default" Class="pa-4 text-center">
+                        No se encontraron conceptos recurrentes asignados a este empleado.
+                    </MudText>
+                }
+                else
+                {
+                    <MudTable Items="@_data.Concepts" Hover="true" Dense="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Concepto</MudTh>
+                            <MudTh>Tipo / Categoría</MudTh>
+                            <MudTh>Monto</MudTh>
+                            <MudTh>Periodicidad</MudTh>
+                            <MudTh>Estado de Cuotas / Saldo</MudTh>
+                            <MudTh>Vigencia</MudTh>
+                            <MudTh>Estado</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Concepto">
+                                <MudText Typo="Typo.body2"><strong>@context.ConceptName</strong></MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Tipo">
+                                <MudChip T="string" Size="Size.Small" Color="@(context.Type == "Perception" ? Color.Success : Color.Error)">
+                                    @(context.Type == "Perception" ? "Percepción" : "Deducción")
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Class="mt-1">@context.Category</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Monto">
+                                <MudText Typo="Typo.body2" Color="Color.Primary">C$ @context.Amount.ToString("N2")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Periodicidad">
+                                @context.Periodicity
+                            </MudTd>
+                            <MudTd DataLabel="Cuotas/Saldo">
+                                @if (!string.IsNullOrEmpty(context.InstallmentsInfo))
+                                {
+                                    <MudText Typo="Typo.body2">Cuota: @context.InstallmentsInfo</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Warning">Saldo: C$ @context.RemainingBalance?.ToString("N2")</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption">N/A</MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Vigencia">
+                                <MudText Typo="Typo.body2">@context.StartDate?.ToString("dd/MM/yyyy")</MudText>
+                                <MudText Typo="Typo.caption">@(context.EndDate?.ToString("dd/MM/yyyy") ?? "Indefinido")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Estado">
+                                @if (context.IsActive)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">✅ Activo</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">⏹️ Inactivo</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- SECCIÓN 2: RETENCIONES JUDICIALES -->
+        <MudItem xs="12" Class="mt-4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">⚖️ Retenciones Judiciales (Embargos / Pensión)</MudText>
+
+                @if (!_data.Garnishments.Any())
+                {
+                    <MudText Typo="Typo.body1" Color="Color.Default" Class="pa-4 text-center">
+                        No se encontraron retenciones judiciales activas o históricas.
+                    </MudText>
+                }
+                else
+                {
+                    <MudTable Items="@_data.Garnishments" Hover="true" Dense="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>N° Expediente</MudTh>
+                            <MudTh>Límite Legal</MudTh>
+                            <MudTh>Monto Total a Retener</MudTh>
+                            <MudTh>Retenido a la Fecha</MudTh>
+                            <MudTh>Vigencia</MudTh>
+                            <MudTh>Estado</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Tipo">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                                    @(context.Type == "Alimony" ? "Pensión Alimenticia" : "Embargo Civil")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Expediente">
+                                <MudText Typo="Typo.body2"><strong>@context.CourtOrderNumber</strong></MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Límite">
+                                <MudText Typo="Typo.body2">@context.PercentageLimit% del neto</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Monto Total">
+                                <MudText Typo="Typo.body2">C$ @context.TotalAmountToWithhold.ToString("N2")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Retenido">
+                                <MudText Typo="Typo.body2" Color="Color.Error">C$ @context.WithheldToDate.ToString("N2")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Vigencia">
+                                <MudText Typo="Typo.body2">@context.StartDate.ToString("dd/MM/yyyy")</MudText>
+                                <MudText Typo="Typo.caption">@(context.EndDate?.ToString("dd/MM/yyyy") ?? "Indefinido")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Estado">
+                                @if (context.IsActive)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">⚠️ Activo</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">✅ Cumplido</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudAlert Severity="Severity.Error">No se pudo cargar la información de conceptos.</MudAlert>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private EmployeeConceptsResultDto? _data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/employees/{Id}/concepts");
+            if (response.IsSuccessStatusCode)
+            {
+                _data = await response.Content.ReadFromJsonAsync<EmployeeConceptsResultDto>();
+            }
+            else
+            {
+                Snackbar.Add("❌ Error al cargar los conceptos", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error de conexión: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo($"/employees/{Id}");
+}

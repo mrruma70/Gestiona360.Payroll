@@ -1,0 +1,298 @@
+/* ==========================================================
+   GESTIONA360 PAYROLL ERP
+   ========================================================== */
+
+/* ==========================================================
+   GENERAL
+   ========================================================== */
+
+html,
+body {
+    background: #F4F6F8;
+    color: #1F2937;
+}
+
+/* ==========================================================
+   MAIN CONTENT
+   ========================================================== */
+
+.mud-main-content {
+    background: #F4F6F8 !important;
+    padding: 24px;
+    min-height: 100vh;
+}
+
+/* ==========================================================
+   APPBAR
+   ========================================================== */
+
+.mud-appbar {
+    background: #1A1A1A !important;
+    color: #FFD700 !important;
+    border-bottom: 1px solid #2D2D2D;
+}
+
+    .mud-appbar .mud-icon-button {
+        color: #FFD700 !important;
+    }
+
+    .mud-appbar .mud-typography {
+        color: #FFD700 !important;
+    }
+
+/* ==========================================================
+   SIDEBAR / MENU
+   ========================================================== */
+
+.mud-drawer {
+    background: #1A1A1A !important;
+    border-right: 1px solid #2D2D2D !important;
+}
+
+.mud-navmenu {
+    background: #1A1A1A !important;
+}
+
+.mud-nav-link {
+    color: #E0E0E0 !important;
+    border-radius: 8px;
+    margin: 2px 8px;
+}
+
+    .mud-nav-link:hover {
+        background: #2D2D2D !important;
+        color: #FFD700 !important;
+    }
+
+    .mud-nav-link.active {
+        background: #333333 !important;
+        color: #FFD700 !important;
+        font-weight: 600;
+    }
+
+.mud-nav-group .mud-nav-link {
+    color: #D5D5D5 !important;
+}
+
+.mud-nav-group-text {
+    color: #EAEAEA !important;
+    font-weight: 600;
+}
+
+.mud-nav-group .mud-icon-root,
+.mud-nav-link .mud-icon-root {
+    color: #FFD700 !important;
+}
+
+/* ==========================================================
+   PAPERS
+   ========================================================== */
+
+.mud-paper {
+    background: #FFFFFF;
+}
+
+/* ==========================================================
+   TABLES
+   ========================================================== */
+
+.mud-table {
+    background: #FFFFFF !important;
+    border-radius: 12px;
+}
+
+.mud-table-container {
+    background: #FFFFFF !important;
+}
+
+.mud-table-head {
+    background: #F8F9FA !important;
+}
+
+    .mud-table-head th {
+        color: #374151 !important;
+        font-weight: 700 !important;
+    }
+
+.mud-table-body td {
+    color: #1F2937 !important;
+}
+
+/* ==========================================================
+   INPUTS NORMALES (PANTALLA)
+   ========================================================== */
+
+.mud-input-outlined {
+    background: #FFFFFF !important;
+}
+
+.mud-input-slot {
+    color: #1F2937 !important;
+}
+
+.mud-input-label {
+    color: #6B7280 !important;
+}
+
+.mud-input-outlined-border {
+    border-color: #D1D5DB !important;
+}
+
+.mud-input-control.mud-input-focused .mud-input-outlined-border {
+    border-color: #FFD700 !important;
+}
+
+.mud-input-control.mud-input-focused .mud-input-label {
+    color: #B8860B !important;
+}
+
+/* ==========================================================
+   DRAWER FORM
+   ========================================================== */
+
+.drawer-header {
+    background: #121212;
+    color: #FFFFFF;
+    padding: 20px;
+    border-bottom: 1px solid #2D2D2D;
+}
+
+    .drawer-header h3 {
+        margin: 0;
+        color: #FFFFFF;
+        font-weight: 600;
+    }
+
+.drawer-content {
+    background: #1A1A1A;
+    padding: 24px;
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+}
+
+.drawer-footer {
+    background: #121212;
+    border-top: 1px solid #2D2D2D;
+    padding: 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* ==========================================================
+   INPUTS DEL DRAWER
+   ========================================================== */
+
+.drawer-content .mud-input-outlined {
+    background: #2D2D2D !important;
+    border-radius: 8px;
+}
+
+.drawer-content .mud-input-slot,
+.drawer-content .mud-input-slot input,
+.drawer-content .mud-input-slot textarea,
+.drawer-content .mud-input > input,
+.drawer-content .mud-select-input {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    opacity: 1 !important;
+}
+
+.drawer-content textarea {
+    color: #FFFFFF !important;
+}
+
+.drawer-content .mud-input-label {
+    color: #CFCFCF !important;
+}
+
+.drawer-content .mud-input-helper-text {
+    color: #B0B0B0 !important;
+}
+
+.drawer-content .mud-input-outlined-border {
+    border-color: #555555 !important;
+}
+
+.drawer-content .mud-input-control.mud-input-focused .mud-input-outlined-border {
+    border-color: #FFD700 !important;
+    border-width: 2px !important;
+}
+
+.drawer-content .mud-input-control.mud-input-focused .mud-input-label {
+    color: #FFD700 !important;
+}
+
+.drawer-content input::placeholder,
+.drawer-content textarea::placeholder {
+    color: #9CA3AF !important;
+}
+
+.drawer-content .mud-input-adornment {
+    color: #CFCFCF !important;
+}
+
+.drawer-content .mud-switch-label {
+    color: #FFFFFF !important;
+}
+
+.drawer-content .mud-input-error {
+    color: #FF6B6B !important;
+}
+
+.drawer-content .mud-input-helper-text.mud-input-error {
+    color: #FF6B6B !important;
+}
+
+/* ==========================================================
+   BADGES
+   ========================================================== */
+
+.badge-active {
+    background: #DCFCE7;
+    color: #166534;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-inactive {
+    background: #FEE2E2;
+    color: #991B1B;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ==========================================================
+   EMPTY STATE
+   ========================================================== */
+
+.empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #6B7280;
+}
+
+/* ==========================================================
+   SCROLLBAR
+   ========================================================== */
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555555;
+    border-radius: 10px;
+}
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #FFD700;
+    }

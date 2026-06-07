@@ -1,0 +1,246 @@
+﻿@page "/employees/{id:guid}/personal-actions"
+@using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Acciones de Personal | Gestiona360</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center align-center" style="height: 50vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else
+{
+    <div class="d-flex align-center mb-4">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">Volver</MudButton>
+        <MudText Typo="Typo.h5" Class="ml-4">📄 Historial de Acciones de Personal</MudText>
+    </div>
+
+    <MudText Typo="Typo.subtitle1" Class="mb-4">Empleado: <strong>@_employeeName</strong> (Cédula: @_employeeId)</MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudTable Items="@_actions" Hover="true" Dense="true" Striped="true" Loading="@_isLoading">
+            <HeaderContent>
+                <MudTh Style="width: 120px;">Fecha Efectiva</MudTh>
+                <MudTh Style="width: 150px;">Tipo de Acción</MudTh>
+                <MudTh Style="width: 100px;">Estado</MudTh>
+                <MudTh>Detalle del Cambio</MudTh>
+                <MudTh>Justificación</MudTh>
+                <MudTh Style="width: 150px;">Ejecutado Por</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Fecha">@context.EffectiveDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Tipo">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@GetActionTypeName(context.ActionType)</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Estado">
+                    @if (context.Status == "Executed")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">@TranslateStatus(context.Status)</MudChip>
+                    }
+                    else if (context.Status == "Approved")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@TranslateStatus(context.Status)</MudChip>
+                    }
+                    else if (context.Status == "Rejected")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">@TranslateStatus(context.Status)</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">@TranslateStatus(context.Status)</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Detalle">
+                    @GetChangeDetail(context)
+                </MudTd>
+                <MudTd DataLabel="Justificación">
+                    <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                        @(context.Justification?.Length > 100 ? context.Justification.Substring(0, 100) + "..." : context.Justification)
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Ejecutado">
+                    <MudText Typo="Typo.body2">@context.ApprovedByName</MudText>
+                    @if (context.ExecutedDate.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Success">
+                            @context.ExecutedDate.Value.ToString("dd/MM/yyyy HH:mm")
+                        </MudText>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-8">
+                    🔍 No se encontraron acciones de personal registradas para este empleado.
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private List<PersonalActionDto> _actions = new();
+    private string _employeeName = "Cargando...";
+    private string _employeeId = "...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            // 1. Obtener nombre del empleado
+            var empResponse = await Http.GetAsync($"api/employees/{Id}");
+            if (empResponse.IsSuccessStatusCode)
+            {
+                _employeeName = "Juan Pérez (Demo)"; // Placeholder
+                _employeeId = "001-010285-1234K";
+            }
+
+            // 2. Obtener acciones de personal
+            var actionsResponse = await Http.GetAsync($"api/employees/{Id}/personal-actions");
+            if (actionsResponse.IsSuccessStatusCode)
+            {
+                _actions = await actionsResponse.Content.ReadFromJsonAsync<List<PersonalActionDto>>() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error al cargar el historial: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetActionTypeName(string type)
+    {
+        return type switch
+        {
+            "SalaryChange" => "💰 Salario",
+            "PositionChange" => "🔄 Puesto",
+            "ContractChange" => "📄 Contrato",
+            "ShiftChange" => "⏰ Turno",
+            "CostCenterChange" => "🏢 Centro Costo",
+            "Suspension" => "⏸️ Suspensión",
+            "MassSuspension" => "🏭 Susp. Masiva",
+            "Reinstatement" => "▶️ Reincorporación",
+            "Termination" => "🚪 Terminación",
+            "MassTermination" => "🏚️ Term. Masiva",
+            _ => type
+        };
+    }
+
+    private string TranslateStatus(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Pendiente",
+            "Approved" => "Aprobado",
+            "Executed" => "Ejecutado",
+            "Rejected" => "Rechazado",
+            _ => status
+        };
+    }
+
+    private RenderFragment GetChangeDetail(PersonalActionDto action) => builder =>
+    {
+        builder.OpenElement(0, "div");
+
+        switch (action.ActionType)
+        {
+            case "SalaryChange":
+                if (action.OldBaseSalary.HasValue && action.NewBaseSalary.HasValue)
+                {
+                    builder.OpenElement(1, "div");
+                    builder.AddAttribute(2, "style", "text-decoration: line-through; color: #888;");
+                    builder.AddContent(3, $"C$ {action.OldBaseSalary.Value:N2}");
+                    builder.CloseElement();
+
+                    builder.OpenElement(4, "div");
+                    builder.AddAttribute(5, "style", "color: green; font-weight: bold;");
+                    var diff = action.NewBaseSalary.Value - action.OldBaseSalary.Value;
+                    var pct = action.OldBaseSalary.Value > 0 ? (diff / action.OldBaseSalary.Value * 100) : 0;
+                    builder.AddContent(6, $"➔ C$ {action.NewBaseSalary.Value:N2} ({(diff >= 0 ? "+" : "")}{diff:N2} / {pct:+0.0;-0.0}%)");
+                    builder.CloseElement();
+                }
+                break;
+
+            case "PositionChange":
+                builder.OpenElement(1, "div");
+                builder.AddContent(2, $"Puesto: {action.OldJobGradeName ?? "N/A"} ➔ {action.NewJobGradeName ?? "N/A"}");
+                builder.CloseElement();
+                break;
+
+            case "ContractChange":
+                builder.OpenElement(1, "div");
+                builder.AddContent(2, $"Contrato: {action.OldContractTypeName ?? "N/A"} ➔ {action.NewContractTypeName ?? "N/A"}");
+                builder.CloseElement();
+                break;
+
+            case "ShiftChange":
+                builder.OpenElement(1, "div");
+                builder.AddContent(2, $"Turno: {action.OldShiftName ?? "N/A"} ➔ {action.NewShiftName ?? "N/A"}");
+                builder.CloseElement();
+                break;
+
+            case "CostCenterChange":
+                builder.OpenElement(1, "div");
+                builder.AddContent(2, $"Centro: {action.OldCostCenterName ?? "N/A"} ➔ {action.NewCostCenterName ?? "N/A"}");
+                builder.CloseElement();
+                break;
+
+            case "Suspension":
+            case "MassSuspension":
+                builder.OpenElement(1, "div");
+                builder.AddAttribute(2, "style", "color: orange;");
+                builder.AddContent(3, $"⏸️ {action.CausalDescription ?? "Suspensión"}");
+                builder.CloseElement();
+                if (action.EffectiveDate != default)
+                {
+                    builder.OpenElement(4, "div");
+                    builder.AddAttribute(5, "style", "font-size: 0.85em; color: #666;");
+                    builder.AddContent(6, $"Desde: {action.EffectiveDate:dd/MM/yyyy}");
+                    builder.CloseElement();
+                }
+                break;
+
+            case "Reinstatement":
+                builder.OpenElement(1, "div");
+                builder.AddAttribute(2, "style", "color: green;");
+                builder.AddContent(3, "▶️ Reincorporación activa");
+                builder.CloseElement();
+                break;
+
+            case "Termination":
+            case "MassTermination":
+                builder.OpenElement(1, "div");
+                builder.AddAttribute(2, "style", "color: red; font-weight: bold;");
+                builder.AddContent(3, $"🚪 {action.CausalDescription ?? "Terminación"}");
+                builder.CloseElement();
+                break;
+
+            default:
+                builder.OpenElement(1, "div");
+                builder.AddContent(2, "Sin detalle disponible");
+                builder.CloseElement();
+                break;
+        }
+
+        builder.CloseElement();
+    };
+
+    private void GoBack() => Navigation.NavigateTo($"/employees/{Id}");
+}

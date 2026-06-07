@@ -1,0 +1,36 @@
+﻿@* // App.razor *@
+@using Microsoft.AspNetCore.Components.Routing
+@using Gestiona360.Payroll.Frontend.Layout
+@using MudBlazor
+
+<Router AppAssembly="@typeof(App).Assembly">
+
+    <Found Context="routeData">
+
+        <RouteView RouteData="@routeData"
+                   DefaultLayout="@typeof(MainLayout)" />
+
+        <FocusOnNavigate RouteData="@routeData"
+                         Selector="h1" />
+
+    </Found>
+
+    <NotFound>
+
+        <PageTitle>No encontrado</PageTitle>
+
+        <LayoutView Layout="@typeof(MainLayout)">
+
+            <MudText Typo="Typo.h6"
+                     Align="Align.Center"
+                     Class="mt-12">
+
+                Lo sentimos, no hay nada en esta dirección.
+
+            </MudText>
+
+        </LayoutView>
+
+    </NotFound>
+
+</Router>

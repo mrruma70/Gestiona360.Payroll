@@ -1,0 +1,55 @@
+﻿@using static Gestiona360.Payroll.Frontend.Pages.Catalogs.PayrollFrequencies.Index
+
+<MudItem xs="12">
+    <MudTextField @bind-Value="EditModel.Name"
+                  Label="Nombre *"
+                  Required="true"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense" />
+</MudItem>
+
+<MudItem xs="12">
+    <MudTextField @bind-Value="EditModel.Code"
+                  Label="Código *"
+                  Required="true"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense" />
+</MudItem>
+
+<MudItem xs="12">
+    <MudTextField @bind-Value="EditModel.Description"
+                  Label="Descripción"
+                  Multiline="true"
+                  Lines="3"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense" />
+</MudItem>
+
+<MudItem xs="6">
+    <MudNumericField T="int"
+                     @bind-Value="EditModel.DaysPerPeriod"
+                     Label="Días por período"
+                     Min="1"
+                     Variant="Variant.Outlined"
+                     Margin="Margin.Dense" />
+</MudItem>
+
+<MudItem xs="6">
+    <MudNumericField T="int"
+                     @bind-Value="EditModel.PeriodsPerYear"
+                     Label="Períodos por año"
+                     Min="1"
+                     Variant="Variant.Outlined"
+                     Margin="Margin.Dense" />
+</MudItem>
+
+@code {
+    [Parameter] public bool FormDrawerOpen { get; set; }
+    [Parameter] public EventCallback<bool> FormDrawerOpenChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public bool IsSubmitting { get; set; }
+    [Parameter] public PayrollFrequencyFormModel EditModel { get; set; } = new();
+    [Parameter] public EventCallback OnSaveAsync { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}
+

@@ -1,0 +1,187 @@
+﻿@page "/employees/{id:guid}/payroll-history"
+@using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Historial de Nómina | Gestiona360</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center align-center" style="height: 50vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_history != null)
+{
+    <!-- ENCABEZADO -->
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div class="d-flex align-center">
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">Volver</MudButton>
+            <MudText Typo="Typo.h5" Class="ml-2">📊 Historial de Nómina</MudText>
+        </div>
+        
+    </div>
+    <MudChip T="string" Color="Color.Info">@_history.EmployeeCode - @_history.EmployeeName</MudChip>
+    <MudText Typo="Typo.subtitle1" Class="mb-4">Puesto Actual: <strong>@_history.CurrentPosition</strong></MudText>
+
+    <!-- TARJETAS DE RESUMEN YTD (Año en curso) -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4 d-flex align-center" Elevation="2" Style="border-left: 4px solid var(--mud-palette-primary);">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption">Ingreso Bruto Acumulado (Año)</MudText>
+                    <MudText Typo="Typo.h6">C$ @_history.TotalYtdGross.ToString("N2")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4 d-flex align-center" Elevation="2" Style="border-left: 4px solid var(--mud-palette-success);">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption">Neto Percibido Acumulado (Año)</MudText>
+                    <MudText Typo="Typo.h6">C$ @_history.TotalYtdNet.ToString("N2")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- TABLA DE HISTORIAL -->
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">📅 Registros de Nómina</MudText>
+
+        @if (!_history.Records.Any())
+        {
+            <MudAlert Severity="Severity.Info">Este empleado aún no tiene registros de nómina procesados.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_history.Records" Hover="true" Dense="true" Striped="true">
+                <HeaderContent>
+                    <MudTh>Período</MudTh>
+                    <MudTh>Fecha de Pago</MudTh>
+                    <MudTh Align="Align.Right">Ingreso Bruto</MudTh>
+                    <MudTh Align="Align.Right">Deducciones Totales</MudTh>
+                    <MudTh Align="Align.Right">Neto a Pagar</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh Align="Align.Center">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Período">
+                        <MudText Typo="Typo.body2"><strong>@context.PeriodName</strong></MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Fecha de Pago">
+                        @context.PaymentDate.ToString("dd/MM/yyyy")
+                    </MudTd>
+                    <MudTd DataLabel="Ingreso Bruto" Align="Align.Right">
+                        <MudText Color="Color.Default">C$ @context.GrossIncome.ToString("N2")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Deducciones" Align="Align.Right">
+                        <MudText Color="Color.Error">- C$ @context.TotalDeductions.ToString("N2")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Neto a Pagar" Align="Align.Right">
+                        <MudText Typo="Typo.body2" Color="Color.Success" Style="font-weight: bold;">
+                            C$ @context.NetPay.ToString("N2")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Estado">
+                        @if (context.Status == "Closed" || context.Status == "Audited")
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">✅ @context.Status</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">⏳ @context.Status</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Acciones" Align="Align.Center">
+                        @if (context.HasPaySlip)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                       OnClick="@(() => DownloadPaySlip(context.RecordId))">
+                                Ver Colilla
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Transparent">Sin colilla</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+else
+{
+    <MudAlert Severity="Severity.Error">No se pudo cargar el historial de nómina.</MudAlert>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private EmployeePayrollHistoryResultDto? _history;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/employees/{Id}/payroll-history");
+            if (response.IsSuccessStatusCode)
+            {
+                _history = await response.Content.ReadFromJsonAsync<EmployeePayrollHistoryResultDto>();
+            }
+            else
+            {
+                Snackbar.Add("❌ Error al cargar el historial", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error de conexión: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task DownloadPaySlip(Guid recordId)
+    {
+        try
+        {
+            // NOTA: Ajusta esta ruta al endpoint real de tu controlador de colillas/PDF
+            var response = await Http.GetAsync($"api/payroll/slips/{recordId}/pdf");
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(bytes);
+                var fileName = $"Colilla_{recordId}.pdf";
+
+                await JS.InvokeVoidAsync("downloadFileFromBase64", base64, "application/pdf", fileName);
+                Snackbar.Add("✅ Colilla descargada exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("❌ No se encontró la colilla para este período", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error al descargar: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo($"/employees/{Id}");
+}
