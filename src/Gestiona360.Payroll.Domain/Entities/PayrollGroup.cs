@@ -13,6 +13,8 @@ namespace Gestiona360.Payroll.Domain.Entities
         [Required, MaxLength(50)]
         public string Name { get; set; }
 
+        public string? Code { get; set; }
+
         public int FrequencyId { get; set; }             // FK a PayrollFrequency (int)
         [MaxLength(20)]
         public string CostCenterCode { get; set; }
@@ -20,6 +22,7 @@ namespace Gestiona360.Payroll.Domain.Entities
         public DateTime FirstPeriodStartDate { get; set; }
         public bool IsActive { get; set; }
 
+        public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();
         public virtual PayrollFrequency Frequency { get; set; }
         public virtual ICollection<PayrollPeriod> Periods { get; set; }
     }

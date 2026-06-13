@@ -1,6 +1,9 @@
 ﻿using FluentValidation;
 using Gestiona360.Payroll.Application.Contracts.Reports;
+using Gestiona360.Payroll.Application.Contracts.Services;
 using Gestiona360.Payroll.Application.Features.Employees.Exports;
+using Gestiona360.Payroll.Application.Features.PersonalActions.Strategies;
+using Gestiona360.Payroll.Application.Services;
 using Gestiona360.Payroll.Infrastructure.Reporting;
 using Gestiona360.Payroll.Infrastructure.Reporting.Renderers;
 using MediatR;
@@ -19,6 +22,17 @@ namespace Gestiona360.Payroll.Application
             // Pipeline behavior de validación
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
+
+            // Registro automático de todas las estrategias de acciones
+            // Esto reemplaza el servicio monolítico PersonalActionExecutionService
+            services.Scan(scan => scan
+             .FromAssemblyOf<IPersonalActionStrategy>()
+             .AddClasses(classes => classes
+                 .AssignableToAny(typeof(IPersonalActionStrategy), typeof(IPayrollService))
+             )
+             .AsImplementedInterfaces()
+             .WithScopedLifetime());
+
             // ============================================
             // MOTOR DE REPORTES
             // ============================================
@@ -31,6 +45,11 @@ namespace Gestiona360.Payroll.Application
             services.AddScoped<IReportRenderer, XmlReportRenderer>();
             services.AddScoped<IReportRenderer, PdfFichaRenderer>();
             services.AddScoped<EmployeeExportService>();
+
+            services.AddScoped<IPayrollService, PayrollPeriodService>();
+
+            services.AddScoped<EmployeeBarcodeService>();
+
 
             // Escanea todos los validadores (AbstractValidator<T>) en este assembly
             services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);

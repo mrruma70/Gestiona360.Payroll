@@ -41,6 +41,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 "Planillero",
                 "Contador",
                 "GerenteRRHH",
+                "RRHH",
                 "Auditor",
                 "Consulta"
             };

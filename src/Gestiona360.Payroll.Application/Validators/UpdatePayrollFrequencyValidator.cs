@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using FluentValidation;
-using Gestiona360.Payroll.Application.Commands;
+using Gestiona360.Payroll.Application.Features.PayrollFrequency;
 
 namespace Gestiona360.Payroll.Application.Validators
 {

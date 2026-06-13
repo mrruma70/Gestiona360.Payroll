@@ -14,5 +14,11 @@ namespace Gestiona360.Payroll.Application.Contracts.DTOs
         public string Email { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public bool IsActive { get; set; }
+
+        public decimal BaseSalary { get; set; }
+        public string JobGradeName { get; set; } = string.Empty;
+        public string ShiftName { get; set; } = string.Empty;
+        public string CostCenterCode { get; set; } = string.Empty;
+      
     }
 }

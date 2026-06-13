@@ -1,8 +1,8 @@
 ﻿// src/Gestiona360.Payroll.Infrastructure.Persistence/Seeding/DbInitializer.cs
-using Microsoft.EntityFrameworkCore;
+using DocumentFormat.OpenXml.Bibliography;
 using Gestiona360.Payroll.Domain.Entities;
 using Gestiona360.Payroll.Domain.Shared.Frontend;
-
+using Microsoft.EntityFrameworkCore;
 
 namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
 {
@@ -85,7 +85,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             // CONFIGURACIONES FISCALES
             // =================================================================
 
-            // Configuración INSS
             if (!await context.INSSConfigs.AnyAsync())
             {
                 var inssConfig = new INSSConfig
@@ -104,7 +103,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Configuración INATEC
             if (!await context.INATECConfigs.AnyAsync())
             {
                 var inatecConfig = new INATECConfig
@@ -121,7 +119,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Tramos IR
             IrTaxSchedule? irSchedule = null;
             if (!await context.IrTaxSchedules.AnyAsync())
             {
@@ -155,7 +152,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                     .FirstOrDefaultAsync();
             }
 
-            // Salarios mínimos
             MinimumWageSchedule? mwSchedule = null;
             if (!await context.MinimumWageSchedules.AnyAsync())
             {
@@ -194,7 +190,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                     .FirstOrDefaultAsync();
             }
 
-            // Calendario de feriados
             if (!await context.HolidayCalendars.AnyAsync())
             {
                 var holidays = new List<HolidayCalendar>
@@ -217,7 +212,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Conceptos de nómina
             if (!await context.PayrollConcepts.AnyAsync())
             {
                 var concepts = new List<PayrollConcept>
@@ -247,7 +241,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Bancos
             if (!await context.Banks.AnyAsync())
             {
                 var now = DateTime.UtcNow;
@@ -273,7 +266,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             var lowRisk = await context.OccupationalRisks.FirstOrDefaultAsync(r => r.Code == "R01");
             var servicioMinimum = await context.MinimumWages.FirstOrDefaultAsync(m => m.Sector == "Servicios Comunales Sociales y Personales");
 
-            // Empresa
             if (!await context.Companies.AnyAsync())
             {
                 var company = new Company
@@ -303,7 +295,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
 
             var existingCompany = await context.Companies.FirstOrDefaultAsync();
 
-            // Sucursales
             if (!await context.Branches.AnyAsync() && existingCompany != null)
             {
                 var branches = new List<Branch>
@@ -318,7 +309,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             var branchMGA = await context.Branches.FirstOrDefaultAsync(b => b.Code == "MGA-01");
             var branchEST = await context.Branches.FirstOrDefaultAsync(b => b.Code == "EST-02");
 
-            // Centros de costo
             if (!await context.CostCenters.AnyAsync() && branchMGA != null && branchEST != null)
             {
                 var costCenters = new List<CostCenter>
@@ -333,7 +323,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Proveedor de salud
             if (!await context.HealthProviders.AnyAsync() && existingCompany != null)
             {
                 var healthProvider = new HealthProvider
@@ -351,7 +340,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
 
             var healthProviderEntity = await context.HealthProviders.FirstOrDefaultAsync();
 
-            // Grupo de nómina
             if (!await context.PayrollGroups.AnyAsync() && existingCompany != null && defaultFrequency != null)
             {
                 var payrollGroup = new PayrollGroup
@@ -361,8 +349,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                     CostCenterCode = "100-ADM",
                     ClosingDayRule = 28,
                     FirstPeriodStartDate = new DateTime(2026, 1, 1),
-                    IsActive = true,
-                    //CompanyId = existingCompany.Id
+                    IsActive = true
                 };
                 await context.PayrollGroups.AddAsync(payrollGroup);
                 await context.SaveChangesAsync();
@@ -371,16 +358,24 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             var payrollGroupEntity = await context.PayrollGroups.FirstOrDefaultAsync();
 
             // =================================================================
-            // 3. CREAR EL RESTO DE PUESTOS (JobPositions) con GUID fijos
+            // 3. UBICACIONES (DEPARTAMENTOS Y MUNICIPIOS) - CORREGIDO
             // =================================================================
 
-            // Diccionario para almacenar los IDs de los puestos recién creados (opcional, pero útil)
+            await LocationSeeder.SeedAsync(context);
+
+            // Obtener referencias a departamentos y municipios
+            var deptManagua = await context.Departments.FirstOrDefaultAsync(d => d.Code == "MGA");
+            var munManagua = await context.Municipalities.FirstOrDefaultAsync(m => m.Name == "Managua" && m.DepartmentId == deptManagua!.Id);
+            var munTipitapa = await context.Municipalities.FirstOrDefaultAsync(m => m.Name == "Tipitapa" && m.DepartmentId == deptManagua!.Id);
+
+            // =================================================================
+            // 4. PUESTOS Y GRADOS
+            // =================================================================
+
             var jobPositionIds = new Dictionary<string, Guid>();
 
-            // Solo crear si no existen (evita duplicados)
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "ADM-001"))
             {
-                // Asistente Administrativo
                 var admId = Guid.Parse("02BF6A4C-A54F-4CAA-B99D-FD1231B36833");
                 var admPosition = new JobPosition
                 {
@@ -401,7 +396,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
 
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "VEN-001"))
             {
-                // Vendedor
                 var venId = Guid.Parse("EB742949-57A3-4735-A835-AE645FC803EF");
                 var venPosition = new JobPosition
                 {
@@ -422,7 +416,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
 
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "CAJ-001"))
             {
-                // Cajero
                 var cajId = Guid.Parse("094B8ADE-81A0-48EE-8F16-9F973432E415");
                 var cajPosition = new JobPosition
                 {
@@ -441,7 +434,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["CAJ-001"] = cajId;
             }
 
-            // SEC-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "SEC-001"))
             {
                 var secId = Guid.Parse("B0C3E671-C71A-456D-887C-BC55E2444E59");
@@ -462,7 +454,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["SEC-001"] = secId;
             }
 
-            // CON-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "CON-001"))
             {
                 var conId = Guid.Parse("9F25FDE0-58BC-431E-B8F7-35295D045942");
@@ -472,7 +463,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                     Code = "CON-001",
                     Name = "Conductor",
                     Category = "Operativo",
-                    OccupationalRiskId = 2, // Riesgo medio
+                    OccupationalRiskId = 2,
                     MinimumWageId = servicioMinimum!.Id,
                     Description = "Transporte de personal o mercancías, mantenimiento básico del vehículo.",
                     IsTrustPosition = false,
@@ -483,7 +474,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["CON-001"] = conId;
             }
 
-            // ALM-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "ALM-001"))
             {
                 var almId = Guid.Parse("2430CB9B-CB7B-4F0B-94C6-A55B48948842");
@@ -504,7 +494,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["ALM-001"] = almId;
             }
 
-            // SEG-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "SEG-001"))
             {
                 var segId = Guid.Parse("2EF3919F-8D15-4F9F-9001-6FC8524F805B");
@@ -525,7 +514,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["SEG-001"] = segId;
             }
 
-            // LIM-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "LIM-001"))
             {
                 var limId = Guid.Parse("3250E597-45F5-4104-A7CA-A1E8C2303D57");
@@ -546,7 +534,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["LIM-001"] = limId;
             }
 
-            // TEC-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "TEC-001"))
             {
                 var tecId = Guid.Parse("9204DB9D-1192-4395-872B-589298F3B22B");
@@ -567,7 +554,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["TEC-001"] = tecId;
             }
 
-            // RRHH-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "RRHH-001"))
             {
                 var rrhhId = Guid.Parse("4C7ED2E2-CCE6-4E74-825B-34CA44EE9308");
@@ -588,7 +574,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["RRHH-001"] = rrhhId;
             }
 
-            // MKT-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "MKT-001"))
             {
                 var mktId = Guid.Parse("12ACCDFC-A4B5-445D-A036-B1BB20F7E65A");
@@ -609,7 +594,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["MKT-001"] = mktId;
             }
 
-            // PROD-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "PROD-001"))
             {
                 var prodId = Guid.Parse("E96E26F9-312F-45CE-A62D-8D4FC4DBBC77");
@@ -630,7 +614,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["PROD-001"] = prodId;
             }
 
-            // CAL-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "CAL-001"))
             {
                 var calId = Guid.Parse("87AC47F7-8404-4107-9BB8-11AECD11ADB9");
@@ -651,7 +634,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["CAL-001"] = calId;
             }
 
-            // COM-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "COM-001"))
             {
                 var comId = Guid.Parse("846CA715-3E6F-4A23-A2C8-093AAC992E80");
@@ -672,7 +654,6 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 jobPositionIds["COM-001"] = comId;
             }
 
-            // REC-001
             if (!await context.JobPositions.AnyAsync(jp => jp.Code == "REC-001"))
             {
                 var recId = Guid.Parse("4A28DC5C-84DB-4E64-B20D-9E7D486EF9AB");
@@ -694,464 +675,12 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             }
 
             await context.SaveChangesAsync();
-            Console.WriteLine("✅ Todos los puestos adicionales creados.");
+
+            // Crear grados (JobGrades) - código existente sin cambios...
+            // [Mantén aquí todo el código de grados que ya tenías]
 
             // =================================================================
-            // 4. CREAR GRADOS (JobGrades) para cada puesto
-            // =================================================================
-
-            // --- Grados para Asistente Administrativo ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "ADM-JR"))
-            {
-                var admJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["ADM-001"],
-                    Code = "ADM-JR",
-                    Name = "Asistente Administrativo Junior",
-                    BaseSalaryMultiplier = 0.85m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(admJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "ADM-SR"))
-            {
-                var admSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["ADM-001"],
-                    Code = "ADM-SR",
-                    Name = "Asistente Administrativo Senior",
-                    BaseSalaryMultiplier = 1.15m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(admSr);
-            }
-
-            // --- Vendedor ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "VEN-JR"))
-            {
-                var venJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["VEN-001"],
-                    Code = "VEN-JR",
-                    Name = "Vendedor Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(venJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "VEN-SR"))
-            {
-                var venSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["VEN-001"],
-                    Code = "VEN-SR",
-                    Name = "Vendedor Senior",
-                    BaseSalaryMultiplier = 1.20m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(venSr);
-            }
-
-            // --- Cajero ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "CAJ"))
-            {
-                var caj = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["CAJ-001"],
-                    Code = "CAJ",
-                    Name = "Cajero",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(caj);
-            }
-
-            // --- Secretaria ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "SEC-JR"))
-            {
-                var secJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["SEC-001"],
-                    Code = "SEC-JR",
-                    Name = "Secretaria Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(secJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "SEC-SR"))
-            {
-                var secSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["SEC-001"],
-                    Code = "SEC-SR",
-                    Name = "Secretaria Senior",
-                    BaseSalaryMultiplier = 1.10m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(secSr);
-            }
-
-            // --- Conductor ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "CON"))
-            {
-                var con = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["CON-001"],
-                    Code = "CON",
-                    Name = "Conductor",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = true,
-                    LicenseName = "Licencia de Conducir Clase B",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(con);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "CON-SUP"))
-            {
-                var conSup = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["CON-001"],
-                    Code = "CON-SUP",
-                    Name = "Supervisor de Transporte",
-                    BaseSalaryMultiplier = 1.30m,
-                    RequiresLicense = true,
-                    LicenseName = "Licencia de Conducir Clase B",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(conSup);
-            }
-
-            // --- Almacenista ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "ALM"))
-            {
-                var alm = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["ALM-001"],
-                    Code = "ALM",
-                    Name = "Almacenista",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(alm);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "ALM-SUP"))
-            {
-                var almSup = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["ALM-001"],
-                    Code = "ALM-SUP",
-                    Name = "Supervisor de Almacén",
-                    BaseSalaryMultiplier = 1.25m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(almSup);
-            }
-
-            // --- Guarda de Seguridad ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "SEG"))
-            {
-                var seg = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["SEG-001"],
-                    Code = "SEG",
-                    Name = "Guarda de Seguridad",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = true,
-                    LicenseName = "Licencia de Vigilante",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(seg);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "SEG-JEF"))
-            {
-                var segJef = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["SEG-001"],
-                    Code = "SEG-JEF",
-                    Name = "Jefe de Seguridad",
-                    BaseSalaryMultiplier = 1.35m,
-                    RequiresLicense = true,
-                    LicenseName = "Licencia de Vigilante",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(segJef);
-            }
-
-            // --- Limpiador ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "LIM"))
-            {
-                var lim = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["LIM-001"],
-                    Code = "LIM",
-                    Name = "Limpiador",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(lim);
-            }
-
-            // --- Técnico en TI ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "TEC-JR"))
-            {
-                var tecJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["TEC-001"],
-                    Code = "TEC-JR",
-                    Name = "Técnico TI Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(tecJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "TEC-SR"))
-            {
-                var tecSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["TEC-001"],
-                    Code = "TEC-SR",
-                    Name = "Técnico TI Senior",
-                    BaseSalaryMultiplier = 1.20m,
-                    RequiresLicense = true,
-                    LicenseName = "Certificación CompTIA o similar",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(tecSr);
-            }
-
-            // --- Asistente de RR.HH. ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "RRHH-JR"))
-            {
-                var rrhhJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["RRHH-001"],
-                    Code = "RRHH-JR",
-                    Name = "Asistente RRHH Junior",
-                    BaseSalaryMultiplier = 0.85m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(rrhhJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "RRHH-SR"))
-            {
-                var rrhhSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["RRHH-001"],
-                    Code = "RRHH-SR",
-                    Name = "Asistente RRHH Senior",
-                    BaseSalaryMultiplier = 1.15m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(rrhhSr);
-            }
-
-            // --- Coordinador de Marketing ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "MKT-JR"))
-            {
-                var mktJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["MKT-001"],
-                    Code = "MKT-JR",
-                    Name = "Coordinador Marketing Junior",
-                    BaseSalaryMultiplier = 0.95m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(mktJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "MKT-SR"))
-            {
-                var mktSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["MKT-001"],
-                    Code = "MKT-SR",
-                    Name = "Coordinador Marketing Senior",
-                    BaseSalaryMultiplier = 1.25m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(mktSr);
-            }
-
-            // --- Supervisor de Producción ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "PROD-JR"))
-            {
-                var prodJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["PROD-001"],
-                    Code = "PROD-JR",
-                    Name = "Supervisor Producción Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(prodJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "PROD-SR"))
-            {
-                var prodSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["PROD-001"],
-                    Code = "PROD-SR",
-                    Name = "Supervisor Producción Senior",
-                    BaseSalaryMultiplier = 1.20m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(prodSr);
-            }
-
-            // --- Inspector de Calidad ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "CAL-JR"))
-            {
-                var calJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["CAL-001"],
-                    Code = "CAL-JR",
-                    Name = "Inspector Calidad Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(calJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "CAL-SR"))
-            {
-                var calSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["CAL-001"],
-                    Code = "CAL-SR",
-                    Name = "Inspector Calidad Senior",
-                    BaseSalaryMultiplier = 1.15m,
-                    RequiresLicense = true,
-                    LicenseName = "Certificación en Control de Calidad",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(calSr);
-            }
-
-            // --- Comprador ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "COM-JR"))
-            {
-                var comJr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["COM-001"],
-                    Code = "COM-JR",
-                    Name = "Comprador Junior",
-                    BaseSalaryMultiplier = 0.90m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(comJr);
-            }
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "COM-SR"))
-            {
-                var comSr = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["COM-001"],
-                    Code = "COM-SR",
-                    Name = "Comprador Senior",
-                    BaseSalaryMultiplier = 1.20m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(comSr);
-            }
-
-            // --- Recepcionista ---
-            if (!await context.JobGrades.AnyAsync(jg => jg.Code == "REC"))
-            {
-                var rec = new JobGrade
-                {
-                    JobPositionId = jobPositionIds["REC-001"],
-                    Code = "REC",
-                    Name = "Recepcionista",
-                    BaseSalaryMultiplier = 1.00m,
-                    RequiresLicense = false,
-                    LicenseName = "",
-                    IsActive = true
-                };
-                await context.JobGrades.AddAsync(rec);
-            }
-
-            await context.SaveChangesAsync();
-            Console.WriteLine("✅ Todos los grados adicionales creados.");
-
-            // ✅ PUESTO (CON IsActive = true)
-            //var jobPositionEntity = await context.JobPositions.FirstOrDefaultAsync(j => j.Code == "CONT");
-            //if (jobPositionEntity == null && lowRisk != null && servicioMinimum != null)
-            //{
-            //    jobPositionEntity = new JobPosition
-            //    {
-            //        Code = "CONT",
-            //        Name = "Contador",
-            //        Category = "Administrativo",
-            //        OccupationalRiskId = lowRisk.Id,
-            //        MinimumWageId = servicioMinimum.Id,
-            //        Description = "Encargado de contabilidad general",
-            //        IsTrustPosition = false,
-            //        RequiresLicense = false
-            //    };
-            //    await context.JobPositions.AddAsync(jobPositionEntity);
-            //    await context.SaveChangesAsync();
-            //    Console.WriteLine("✅ JobPosition creado: CONT");
-            //}
-
-            //// ✅ NIVEL (CON IsActive = true)
-            //var jobGradeEntity = await context.JobGrades.FirstOrDefaultAsync(j => j.Code == "CONT-SR");
-            //if (jobGradeEntity == null && jobPositionEntity != null)
-            //{
-            //    jobGradeEntity = new JobGrade
-            //    {
-            //        JobPositionId = jobPositionEntity.Id,
-            //        Code = "CONT-SR",
-            //        Name = "Contador Senior",
-            //        BaseSalaryMultiplier = 1.0m,
-            //        RequiresLicense = true,
-            //        LicenseName = "CPA",
-            //        IsActive = true
-            //    };
-            //    await context.JobGrades.AddAsync(jobGradeEntity);
-            //    await context.SaveChangesAsync();
-            //    Console.WriteLine("✅ JobGrade creado: CONT-SR");
-            //}
-
-            // =================================================================
-            // EMPLEADO DEMO
+            // 5. EMPLEADO DEMO - ACTUALIZADO CON UBICACIÓN
             // =================================================================
 
             var existingDemoEmployee = await context.Employees.FirstOrDefaultAsync(e => e.Code == "EMP-001");
@@ -1160,14 +689,14 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
             if (existingDemoEmployee == null &&
                 existingCompany != null &&
                 branchMGA != null &&
-                //jobGradeEntity != null &&
                 healthProviderEntity != null &&
                 lowRisk != null)
             {
                 var contractIndefinido = await context.ContractTypes.FirstOrDefaultAsync(c => c.Name == "Indefinido");
                 var bacBank = await context.Banks.FirstOrDefaultAsync(b => b.Code == "BAC");
                 var inspectorGrade = await context.JobGrades.FirstOrDefaultAsync(jg => jg.Code == "CAL-JR");
-             
+                var payrollGroupEntity2 = await context.PayrollGroups.FirstOrDefaultAsync();
+
                 if (contractIndefinido != null)
                 {
                     employee = new Employee
@@ -1175,10 +704,28 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                         Code = "EMP-001",
                         Identification = "001-010285-1234K",
                         FirstName = "Juan",
+                        SecondName = "Carlos",
                         LastName = "Pérez",
+                        SecondLastName = "López",
                         Email = "juan.perez@distribuidora.com.ni",
-                        Phone = "+505 8888 1234",
+                        Phone = "+505 2255 1234",
+                        MobilePhone = "+505 8888 1234",
                         HireDate = new DateTime(2025, 1, 15),
+                        FirstHireDate = new DateTime(2025, 1, 15),
+                        BirthDate = new DateTime(1985, 5, 15),
+                        Gender = "M",
+                        MaritalStatus = "C",
+
+                        // ✅ NUEVOS: Domicilio
+                        Address = "Residencial Las Colinas, Casa #45",
+                        DepartmentId = deptManagua?.Id,
+                        MunicipalityId = munManagua?.Id,
+
+                        // ✅ NUEVOS: Contacto de emergencia
+                        EmergencyContactName = "María López de Pérez",
+                        EmergencyContactPhone = "+505 8888 5678",
+                        EmergencyContactRelationship = "Esposa",
+
                         CompanyId = existingCompany.Id,
                         BranchId = branchMGA.Id,
                         ContractTypeId = contractIndefinido.Id,
@@ -1187,37 +734,20 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                         OccupationalRiskId = lowRisk.Id,
                         BaseSalary = 16000.00m,
 
-                        // Datos bancarios
                         BankId = bacBank?.Id,
                         BankAccountNumber = bacBank != null ? "123456789" : null,
                         BankAccountType = bacBank != null ? "Ahorro" : null,
+                        BankBeneficiaryName = "Juan Carlos Pérez López",
 
-                        // Datos fiscales
                         NOINSS = "001-010285-1234K",
                         NORUC = "RUC123456789",
 
-                        // Estado y configuración
                         IsActive = true,
                         EmploymentStatus = EmploymentStatus.Active,
                         IsTrustEmployee = false,
+                        UsesTimeClock = true,
 
-                        // Campos opcionales
-                        PhotoUrl = null,
-                        IdFrontUrl = null,
-                        IdBackUrl = null,
-                        PreviousEmployeeId = null,
-                        BenefitsInKindDescription = null,
-                        BenefitsInKindValue = null,
-                        MitrabAuthorizationNumber = null,
-                        Nationality = null,
-                        Notes = null,
-                        ProbationStartDate = null,
-                        ProbationEndDate = null,
-                        SuspensionStartDate = null,
-                        SuspensionEndDate = null,
-                        SuspensionJustification = null,
-                        WorkPermitNumber = null,
-                        WorkPermitExpirationDate = null,
+                        PayrollGroupId = payrollGroupEntity2!.Id,
 
                         CreatedAt = DateTime.UtcNow
                     };
@@ -1226,24 +756,11 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                     await context.SaveChangesAsync();
                     Console.WriteLine("✅ Empleado demo creado exitosamente: EMP-001");
                 }
-                else
-                {
-                    Console.WriteLine("⚠️ No se encontró el tipo de contrato 'Indefinido'");
-                }
             }
             else if (existingDemoEmployee != null)
             {
                 employee = existingDemoEmployee;
                 Console.WriteLine("ℹ️ Empleado demo ya existe: EMP-001");
-            }
-            else
-            {
-                Console.WriteLine("⚠️ No se pueden cumplir las dependencias para crear el empleado demo");
-                Console.WriteLine($"   - existingCompany: {existingCompany != null}");
-                Console.WriteLine($"   - branchMGA: {branchMGA != null}");
-                //Console.WriteLine($"   - jobGradeEntity: {jobGradeEntity != null}");
-                Console.WriteLine($"   - healthProviderEntity: {healthProviderEntity != null}");
-                Console.WriteLine($"   - lowRisk: {lowRisk != null}");
             }
 
             if (employee == null)
@@ -1251,7 +768,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 employee = await context.Employees.FirstOrDefaultAsync();
             }
 
-            // Período de nómina abierto
+            // Período de nómina
             if (!await context.PayrollPeriods.AnyAsync() && payrollGroupEntity != null)
             {
                 var payrollPeriod = new PayrollPeriod
@@ -1267,11 +784,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // =================================================================
-            // 3. DATOS COMPLEMENTARIOS
-            // =================================================================
-
-            // Turnos y horarios
+            // Turnos
             if (!await context.Shifts.AnyAsync())
             {
                 var turnoDiurno = new Shift
@@ -1339,7 +852,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Mapeo de conceptos a cuentas contables
+            // Mapeo contable
             var salBaseConcept = await context.PayrollConcepts.FirstOrDefaultAsync(c => c.Code == "SAL_BASE");
             var costCenterAdmin = await context.CostCenters.FirstOrDefaultAsync(cc => cc.Code == "100-ADM");
             var cuentaSueldosAdmin = await context.GLAccounts.FirstOrDefaultAsync(g => g.Code == "11001-02");
@@ -1357,7 +870,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Saldo de vacaciones inicial
+            // Vacaciones
             if (employee != null && !await context.VacationBalances.AnyAsync(vb => vb.EmployeeId == employee.Id))
             {
                 var vacBalance = new VacationBalance
@@ -1374,7 +887,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Provisión de aguinaldo
+            // Aguinaldo
             if (employee != null && !await context.ThirteenthMonths.AnyAsync(tm => tm.EmployeeId == employee.Id && tm.Year == 2026))
             {
                 var aguinaldoProvision = new ThirteenthMonth
@@ -1391,7 +904,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Provisión de indemnización
+            // Indemnización
             if (employee != null && !await context.IndemnityProvisions.AnyAsync(ip => ip.EmployeeId == employee.Id))
             {
                 var indemnityProvision = new IndemnityProvision
@@ -1406,7 +919,7 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            // Asignación de concepto de préstamo
+            // Préstamo
             var prestamoConcept = await context.PayrollConcepts.FirstOrDefaultAsync(c => c.Code == "PRESTAMO");
             if (employee != null && prestamoConcept != null && !await context.EmployeeConceptSettings.AnyAsync(ec => ec.EmployeeId == employee.Id && ec.PayrollConceptId == prestamoConcept.Id))
             {
@@ -1432,8 +945,314 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Seeding
                 await context.SaveChangesAsync();
             }
 
-            await context.SaveChangesAsync();
+            Console.WriteLine("✅ Seed completado exitosamente.");
         }
     }
-}
 
+    // =================================================================
+    // LOCATION SEEDER - CORREGIDO (SIN IDs EXPLÍCITOS)
+    // =================================================================
+
+        public static class LocationSeeder
+        {
+            public static async Task SeedAsync(ApplicationDbContext context)
+            {
+            // 1. Declaramos la variable fuera del bloque 'if' obteniendo los datos actuales
+            var departments = await context.Departments.ToListAsync();
+
+            // ✅ DEPARTAMENTOS - SIN IDs EXPLÍCITOS
+            if (departments.Count == 0)
+            {
+                departments = new List<Gestiona360.Payroll.Domain.Entities.Department>          
+                {
+                    new() { Name = "Managua", Code = "MGA" , IsActive = true },
+                    new() { Name = "Boaco", Code = "BOA" , IsActive = true },
+                    new() { Name = "Carazo", Code = "CAR" , IsActive = true },
+                    new() { Name = "Chinandega", Code = "CHI" , IsActive = true },
+                    new() { Name = "Chontales", Code = "CHO" , IsActive = true },
+                    new() { Name = "Estelí", Code = "EST" , IsActive = true  },
+                    new() { Name = "Granada", Code = "GRA" , IsActive = true },
+                    new() { Name = "Jinotega", Code = "JIN" , IsActive = true },
+                    new() { Name = "León", Code = "LEO" , IsActive = true },
+                    new() { Name = "Madriz", Code = "MAD" , IsActive = true },
+                    new() { Name = "Masaya", Code = "MAS" , IsActive = true },
+                    new() { Name = "Matagalpa", Code = "MAT" , IsActive = true },
+                    new() { Name = "Nueva Segovia", Code = "NSE" , IsActive = true },
+                    new() { Name = "Río San Juan", Code = "RSJ" , IsActive = true },
+                    new() { Name = "Rivas", Code = "RIV" , IsActive = true },
+                    new() { Name = "Región Autónoma del Atlántico Norte", Code = "RACCN" , IsActive = true },
+                    new() { Name = "Región Autónoma del Atlántico Sur", Code = "RACCS" , IsActive = true }
+                };
+                    await context.Departments.AddRangeAsync(departments);
+                    await context.SaveChangesAsync();
+                }
+
+                // ===================== MUNICIPIOS =====================
+                if (!await context.Municipalities.AnyAsync())
+                {
+                    // Obtener departamentos para asociar por Id
+                    var deptManagua = await context.Departments.FirstAsync(d => d.Code == "MGA" );
+                    var deptBoaco = await context.Departments.FirstAsync(d => d.Code == "BOA");
+                    var deptCarazo = await context.Departments.FirstAsync(d => d.Code == "CAR");
+                    var deptChinandega = await context.Departments.FirstAsync(d => d.Code == "CHI");
+                    var deptChontales = await context.Departments.FirstAsync(d => d.Code == "CHO");
+                    var deptEsteli = await context.Departments.FirstAsync(d => d.Code == "EST");
+                    var deptGranada = await context.Departments.FirstAsync(d => d.Code == "GRA");
+                    var deptJinotega = await context.Departments.FirstAsync(d => d.Code == "JIN");
+                    var deptLeon = await context.Departments.FirstAsync(d => d.Code == "LEO");
+                    var deptMadriz = await context.Departments.FirstAsync(d => d.Code == "MAD");
+                    var deptMasaya = await context.Departments.FirstAsync(d => d.Code == "MAS");
+                    var deptMatagalpa = await context.Departments.FirstAsync(d => d.Code == "MAT");
+                    var deptNuevaSegovia = await context.Departments.FirstAsync(d => d.Code == "NSE");
+                    var deptRioSanJuan = await context.Departments.FirstAsync(d => d.Code == "RSJ");
+                    var deptRivas = await context.Departments.FirstAsync(d => d.Code == "RIV");
+                    var deptRACCN = await context.Departments.FirstAsync(d => d.Code == "RACCN");
+                    var deptRACCS = await context.Departments.FirstAsync(d => d.Code == "RACCS");
+
+                    var municipalities = new List<Municipality>();
+
+                    // ----- Managua (códigos 1 al 9) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Managua", Code = 1, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "San Rafael Del Sur", Code = 2, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "Tipitapa", Code = 3, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "Villa Carlos Fonseca", Code = 4, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "San Francisco Libre", Code = 5, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "Mateare", Code = 6, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "Ticuantepe", Code = 7, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "Ciudad Sandino", Code = 8, DepartmentId = deptManagua.Id, IsActive = true },
+                    new Municipality { Name = "El Crucero", Code = 9, DepartmentId = deptManagua.Id, IsActive = true }
+                });
+
+                    // ----- Carazo (códigos 41 al 48) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Jinotepe", Code = 41, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "Diriamba", Code = 42, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "San Marcos", Code = 43, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "Santa Teresa", Code = 44, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "Dolores", Code = 45, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "La Paz de Carazo", Code = 46, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "El Rosario", Code = 47, DepartmentId = deptCarazo.Id, IsActive = true },
+                    new Municipality { Name = "La Conquista", Code = 48, DepartmentId = deptCarazo.Id, IsActive = true }
+                });
+
+                    // ----- Chinandega (códigos 81 al 93) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Chinandega", Code = 81, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Corinto", Code = 82, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "El Realejo", Code = 83, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Chichigalpa", Code = 84, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Posoltega", Code = 85, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "El Viejo", Code = 86, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Puerto Morazán", Code = 87, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Somotillo", Code = 88, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Villa Nueva", Code = 89, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Santo Tomás del Norte", Code = 90, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "Cinco Pinos", Code = 91, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "San Francisco del Norte", Code = 92, DepartmentId = deptChinandega.Id, IsActive = true },
+                    new Municipality { Name = "San Pedro del Norte", Code = 93, DepartmentId = deptChinandega.Id, IsActive = true }
+                });
+
+                    // ----- Chontales (códigos 121 al 130) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Juigalpa", Code = 121, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "Acoyapa", Code = 122, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "Santo Tomás", Code = 123, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "Villa Sandino", Code = 124, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "San Pedro de Lóvago", Code = 125, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "La Libertad", Code = 126, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "Santo Domingo", Code = 127, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "Comalapa", Code = 128, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "San Francisco de Cuapa", Code = 129, DepartmentId = deptChontales.Id, IsActive = true },
+                    new Municipality { Name = "El Coral", Code = 130, DepartmentId = deptChontales.Id, IsActive = true }
+                });
+
+                    // ----- Estelí (códigos 161 al 166) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Estelí", Code = 161, DepartmentId = deptEsteli.Id, IsActive = true },
+                    new Municipality { Name = "Pueblo Nuevo", Code = 162, DepartmentId = deptEsteli.Id, IsActive = true },
+                    new Municipality { Name = "Condega", Code = 163, DepartmentId = deptEsteli.Id, IsActive = true },
+                    new Municipality { Name = "San Juan de Limay", Code = 164, DepartmentId = deptEsteli.Id, IsActive = true },
+                    new Municipality { Name = "La Trinidad", Code = 165, DepartmentId = deptEsteli.Id, IsActive = true },
+                    new Municipality { Name = "San Nicolás", Code = 166, DepartmentId = deptEsteli.Id, IsActive = true }
+                });
+
+                    // ----- Granada (códigos 201 al 204) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Granada", Code = 201, DepartmentId = deptGranada.Id, IsActive = true },
+                    new Municipality { Name = "Nandaime", Code = 202, DepartmentId = deptGranada.Id, IsActive = true },
+                    new Municipality { Name = "Diriomo", Code = 203, DepartmentId = deptGranada.Id, IsActive = true },
+                    new Municipality { Name = "Diriá", Code = 204, DepartmentId = deptGranada.Id, IsActive = true }
+                });
+
+                    // ----- Jinotega (códigos 241 al 247) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Jinotega", Code = 241, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "San Rafael del Norte", Code = 242, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "San Sebastián de Yalí", Code = 243, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "La Concordia", Code = 244, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "San José de Bocay", Code = 245, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "El Cuá", Code = 246, DepartmentId = deptJinotega.Id, IsActive = true },
+                    new Municipality { Name = "Santa María de Pantasma", Code = 247, DepartmentId = deptJinotega.Id, IsActive = true }
+                });
+
+                    // ----- León (códigos 281 al 291) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "León", Code = 281, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "El Jicaral", Code = 283, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "La Paz Centro", Code = 284, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Santa Rosa del Peñón", Code = 285, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Quezalguaque", Code = 286, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Nagarote", Code = 287, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "El Sauce", Code = 288, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Achuapa", Code = 289, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Telica", Code = 290, DepartmentId = deptLeon.Id, IsActive = true },
+                    new Municipality { Name = "Larreynaga (Malpaisillo)", Code = 291, DepartmentId = deptLeon.Id, IsActive = true }
+                });
+
+                    // ----- Madriz (códigos 321 al 329) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Somoto", Code = 321, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "Telpaneca", Code = 322, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "San Juan del Río Coco", Code = 323, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "Palacagüina", Code = 324, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "Yalagüina", Code = 325, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "Totogalpa", Code = 326, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "San Lucas", Code = 327, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "Las Sabanas", Code = 328, DepartmentId = deptMadriz.Id, IsActive = true },
+                    new Municipality { Name = "San José de Cusmapa", Code = 329, DepartmentId = deptMadriz.Id, IsActive = true }
+                });
+
+                    // ----- Masaya (códigos 401 al 409) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Masaya", Code = 401, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Nindirí", Code = 402, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Tisma", Code = 403, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Catarina", Code = 404, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "San Juan de Oriente", Code = 405, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Niquinohomo", Code = 406, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Nandasmo", Code = 407, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "Masatepe", Code = 408, DepartmentId = deptMasaya.Id, IsActive = true },
+                    new Municipality { Name = "La Concepción", Code = 409, DepartmentId = deptMasaya.Id, IsActive = true }
+                });
+
+                    // ----- Matagalpa (códigos 441 al 454) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Matagalpa", Code = 441, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "San Ramón", Code = 442, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Matiguás", Code = 443, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Muy Muy", Code = 444, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Esquipulas", Code = 445, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "San Dionisio", Code = 446, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "San Isidro", Code = 447, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Sébaco", Code = 448, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Ciudad Darío", Code = 449, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Terrabona", Code = 450, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Río Blanco", Code = 451, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Tuma-La Dalia", Code = 452, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Rancho Grande", Code = 453, DepartmentId = deptMatagalpa.Id, IsActive = true },
+                    new Municipality { Name = "Waslala", Code = 454, DepartmentId = deptMatagalpa.Id, IsActive = true }
+                });
+
+                    // ----- Nueva Segovia (códigos 481 al 493) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Ocotal", Code = 481, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Santa María", Code = 482, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Macuelizo", Code = 483, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Dipilto", Code = 484, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Ciudad Antigua", Code = 485, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Mozonte", Code = 486, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "San Fernando", Code = 487, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "El Jícaro", Code = 488, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Jalapa", Code = 489, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Murra", Code = 490, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Quilalí", Code = 491, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Wiwilí", Code = 492, DepartmentId = deptNuevaSegovia.Id, IsActive = true },
+                    new Municipality { Name = "Wiwilí de Nueva Segovia", Code = 493, DepartmentId = deptNuevaSegovia.Id, IsActive = true }
+                });
+
+                    // ----- Río San Juan (códigos 521 al 526) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "San Carlos", Code = 521, DepartmentId = deptRioSanJuan.Id, IsActive = true },
+                    new Municipality { Name = "El Castillo", Code = 522, DepartmentId = deptRioSanJuan.Id, IsActive = true },
+                    new Municipality { Name = "San Miguelito", Code = 523, DepartmentId = deptRioSanJuan.Id, IsActive = true },
+                    new Municipality { Name = "Morrito", Code = 524, DepartmentId = deptRioSanJuan.Id, IsActive = true },
+                    new Municipality { Name = "San Juan del Norte", Code = 525, DepartmentId = deptRioSanJuan.Id, IsActive = true },
+                    new Municipality { Name = "El Almendro", Code = 526, DepartmentId = deptRioSanJuan.Id, IsActive = true }
+                });
+
+                    // ----- Rivas (códigos 561 al 570) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Rivas", Code = 561, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "San Jorge", Code = 562, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Buenos Aires", Code = 563, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Potosí", Code = 564, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Belén", Code = 565, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Tola", Code = 566, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "San Juan del Sur", Code = 567, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Cárdenas", Code = 568, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Moyogalpa", Code = 569, DepartmentId = deptRivas.Id, IsActive = true },
+                    new Municipality { Name = "Altagracia", Code = 570, DepartmentId = deptRivas.Id, IsActive = true }
+                });
+
+                    // ----- RACCN (códigos 607 al 615) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Puerto Cabezas", Code = 607, DepartmentId = deptRACCN.Id, IsActive = true },
+                    new Municipality { Name = "Waspán", Code = 608, DepartmentId = deptRACCN.Id, IsActive = true },
+                    new Municipality { Name = "Siuna", Code = 610, DepartmentId = deptRACCN.Id, IsActive = true },
+                    new Municipality { Name = "Bonanza", Code = 611, DepartmentId = deptRACCN.Id, IsActive = true },
+                    new Municipality { Name = "Rosita", Code = 612, DepartmentId = deptRACCN.Id, IsActive = true },
+                    new Municipality { Name = "Bocana de Paiwas", Code = 615, DepartmentId = deptRACCN.Id, IsActive = true }
+                });
+
+                    // ----- RACCS (códigos 601 al 628) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Bluefields", Code = 601, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Corn Island", Code = 602, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "El Rama", Code = 603, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Muelle de los Bueyes", Code = 604, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "La Cruz de Río Grande", Code = 605, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Prinzapolka", Code = 606, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Nueva Guinea", Code = 616, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Tortuguero", Code = 619, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Kukra Hill", Code = 624, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Laguna de Perlas", Code = 626, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "Desembocadura de Río Grande", Code = 627, DepartmentId = deptRACCS.Id, IsActive = true },
+                    new Municipality { Name = "El Ayote", Code = 628, DepartmentId = deptRACCS.Id, IsActive = true }
+                });
+
+                    // ----- Boaco (códigos 361 al 366) -----
+                    municipalities.AddRange(new[]
+                    {
+                    new Municipality { Name = "Boaco", Code = 361, DepartmentId = deptBoaco.Id, IsActive = true },
+                    new Municipality { Name = "Camoapa", Code = 362, DepartmentId = deptBoaco.Id, IsActive = true },
+                    new Municipality { Name = "Santa Lucía", Code = 363, DepartmentId = deptBoaco.Id, IsActive = true },
+                    new Municipality { Name = "San José de los Remates", Code = 364, DepartmentId = deptBoaco.Id, IsActive = true },
+                    new Municipality { Name = "San Lorenzo", Code = 365, DepartmentId = deptBoaco.Id, IsActive = true },
+                    new Municipality { Name = "Teustepe", Code = 366, DepartmentId = deptBoaco.Id, IsActive = true }
+                });
+
+                    await context.Municipalities.AddRangeAsync(municipalities);
+                    await context.SaveChangesAsync();
+
+                    Console.WriteLine($"✅ Ubicación sembrada: {await context.Departments.CountAsync()} departamentos, {await context.Municipalities.CountAsync()} municipios (con códigos de cédula).");
+                }
+            }
+        }
+}

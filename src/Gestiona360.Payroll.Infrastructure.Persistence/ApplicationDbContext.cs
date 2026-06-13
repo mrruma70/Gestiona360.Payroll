@@ -62,6 +62,13 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence
 
         public DbSet<Bank> Banks { get; set; }
         public DbSet<EmployeeSuspension> EmployeeSuspensions { get; set; }
+        public DbSet<MedicalLeave> MedicalLeaves { get; set; }
+
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<Municipality> Municipalities { get; set; }
+        public DbSet<Neighborhood> Neighborhoods { get; set; }
+
+        public DbSet<UserRefreshToken> UserRefreshTokens { get; set; }
 
         // Implementación de los métodos de la interfaz
         public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -82,6 +89,20 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence
             {
                 foreignKey.DeleteBehavior = DeleteBehavior.Restrict;
             }
+
+            // Configurar UserRefreshToken
+            modelBuilder.Entity<UserRefreshToken>()
+                .HasOne(urt => urt.User)
+                .WithMany()
+                .HasForeignKey(urt => urt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserRefreshToken>()
+                .HasIndex(urt => urt.Token)
+                .IsUnique();
+
+            modelBuilder.Entity<UserRefreshToken>()
+                .HasIndex(urt => urt.UserId);
 
             // 2. Configuración de la relación ApplicationUser -> Employee (Sobrescribimos el borrado a SetNull)
             modelBuilder.Entity<ApplicationUser>()

@@ -1,12 +1,13 @@
 ﻿using Gestiona360.Payroll.Application.Contracts.Reports;
 using Gestiona360.Payroll.Application.Contracts.Requests;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize] // ✅ Mantiene la seguridad a nivel de clase
+    [Authorize] 
     public class ReportsController : ControllerBase
     {
         private readonly IReportEngine _reportEngine;

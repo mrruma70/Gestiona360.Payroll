@@ -1,0 +1,668 @@
+﻿@page "/personal-actions"
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions
+
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Acciones de Personal | Gestiona360</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h5" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentTurnedIn" Class="mr-2" />
+            Acciones de Personal
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="Guid"
+                           Value="_selectedPayrollGroupId"
+                           ValueChanged="OnPayrollGroupChanged"
+                           Label="Grupo de Nómina"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Required="true">
+                    @foreach (var group in _payrollGroups)
+                    {
+                        <MudSelectItem Value="@group.Id">@group.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="Guid"
+                           Value="_selectedPayrollPeriodId"
+                           ValueChanged="OnPayrollPeriodChanged"
+                           Label="Período de Nómina"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Required="true"
+                           Disabled="@(!_payrollPeriods.Any())">
+                    @foreach (var period in _payrollPeriods)
+                    {
+                        <MudSelectItem Value="@period.Id">@period.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        @if (!_payrollGroups.Any())
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-4">
+                No se encontraron grupos de nómina activos.
+            </MudAlert>
+        }
+        else if (_selectedPayrollGroupId != Guid.Empty && !_payrollPeriods.Any())
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
+                El grupo seleccionado no tiene períodos disponibles.
+            </MudAlert>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/personal-actions/create">
+                Nueva Acción Individual
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Groups"
+                       OnClick="@(() => Navigation.NavigateTo("/personal-actions/mass"))">
+                Nueva Acción Masiva
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_searchTerm"
+                              Label="Buscar empleado, causal o referencia"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyUp="OnSearchKeyUp" />
+            </MudItem>
+
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string"
+                           @bind-Value="_filterStatus"
+                           Label="Estado"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true">
+                    <MudSelectItem Value="@("Pending")">Pendiente</MudSelectItem>
+                    <MudSelectItem Value="@("Approved")">Aprobado</MudSelectItem>
+                    <MudSelectItem Value="@("Executed")">Ejecutado</MudSelectItem>
+                    <MudSelectItem Value="@("Rejected")">Rechazado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="5" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="ApplyFilters">
+                    Buscar
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           OnClick="ClearFilters"
+                           Class="ml-2">
+                    Limpiar
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Elevation="2">
+        <MudTable @ref="_table"
+                  T="PersonalActionListDto"
+                  Hover="true"
+                  Striped="true"
+                  Dense="true"
+                  Loading="@_isLoading"
+                  LoadingProgressColor="Color.Primary"
+                  ServerData="LoadServerData"
+                  RowsPerPageLabel="Registros por página">
+
+            <ToolBarContent>
+                <MudText Typo="Typo.subtitle1">Listado de acciones</MudText>
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTh Style="width: 110px;">Fecha efecto</MudTh>
+                <MudTh Style="width: 260px;">Empleado / Lote</MudTh>
+                <MudTh Style="width: 170px;">Tipo</MudTh>
+                <MudTh>Descripción</MudTh>
+                <MudTh Style="width: 120px;">Estado</MudTh>
+                <MudTh Style="width: 180px;">Acciones</MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                @{
+                    var normalizedStatus = NormalizeStatus(context.Status);
+                    var (statusColor, statusIcon) = GetStatusColorAndIcon(normalizedStatus);
+                }
+
+                <MudTd DataLabel="Fecha efecto">
+                    @context.EffectiveDate.ToString("dd/MM/yyyy")
+                </MudTd>
+
+                <MudTd DataLabel="Empleado / Lote">
+                    @if (!string.IsNullOrWhiteSpace(context.BatchReference))
+                    {
+                        <div>
+                            <strong>Lote: @context.BatchReference</strong>
+                            <br />
+                            <small class="text-muted">@context.AffectedCount empleado(s)</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <strong>@context.EmployeeName</strong>
+                            <br />
+                            <small class="text-muted">@context.EmployeeCode</small>
+                        </div>
+                    }
+                </MudTd>
+
+                <MudTd DataLabel="Tipo">
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="Color.Primary"
+                             Variant="Variant.Outlined">
+                        @GetActionTypeName(context.ActionType)
+                    </MudChip>
+                </MudTd>
+
+                <MudTd DataLabel="Descripción">
+                    @if (NormalizeActionType(context.ActionType) == "SalaryChange"
+                        && context.OldBaseSalary.HasValue
+                        && context.NewBaseSalary.HasValue)
+                    {
+                        <span style="text-decoration: line-through; color: #888;">
+                            C$ @context.OldBaseSalary.Value.ToString("N2")
+                        </span>
+                        <span style="color: green; font-weight: bold; margin-left: 6px;">
+                            → C$ @context.NewBaseSalary.Value.ToString("N2")
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">@context.CausalDescription</span>
+                    }
+                </MudTd>
+
+                <MudTd DataLabel="Estado">
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@statusColor"
+                             Icon="@statusIcon">
+                        @TranslateStatus(normalizedStatus)
+                    </MudChip>
+                </MudTd>
+
+                <MudTd DataLabel="Acciones">
+                    <MudStack Row="true" Spacing="1" Justify="Justify.Center">
+                        @if (normalizedStatus == "Pending")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => EditAction(context))"
+                                           Title="Editar" />
+
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteAction(context))"
+                                           Title="Eliminar" />
+
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                           Size="Size.Small"
+                                           Color="Color.Success"
+                                           OnClick="@(() => ExecuteAction(context))"
+                                           Title="Ejecutar" />
+                        }
+                        else if (normalizedStatus == "Approved")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                           Size="Size.Small"
+                                           Color="Color.Success"
+                                           OnClick="@(() => ExecuteAction(context))"
+                                           Title="Ejecutar" />
+
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                           Size="Size.Small"
+                                           Color="Color.Info"
+                                           OnClick="@(() => ViewDetail(context))"
+                                           Title="Ver detalle" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                           Size="Size.Small"
+                                           Color="Color.Info"
+                                           OnClick="@(() => ViewDetail(context))"
+                                           Title="Ver detalle" />
+                        }
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+
+            <NoRecordsContent>
+                <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-8">
+                    @GetNoRecordsMessage()
+                </MudText>
+            </NoRecordsContent>
+
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+<MudDrawer @bind-Open="_drawerOpen"
+           Anchor="Anchor.Right"
+           Width="520px"
+           Elevation="16"
+           Variant="DrawerVariant.Temporary">
+    @if (_selectedAction is not null)
+    {
+        <PersonalActionDetailDrawer ActionId="_selectedAction.Id" OnClose="CloseDrawer" />
+    }
+</MudDrawer>
+
+@code {
+    private MudTable<PersonalActionListDto>? _table;
+    private bool _isLoading;
+    private bool _drawerOpen;
+    private PersonalActionListDto? _selectedAction;
+
+    private Guid _selectedPayrollGroupId = Guid.Empty;
+    private Guid _selectedPayrollPeriodId = Guid.Empty;
+
+    private string _searchTerm = string.Empty;
+    private string? _filterStatus;
+
+    private readonly List<PayrollGroupDto> _payrollGroups = new();
+    private readonly List<PayrollPeriodDto> _payrollPeriods = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPayrollGroups();
+    }
+
+    private async Task LoadPayrollGroups()
+    {
+        try
+        {
+            _payrollGroups.Clear();
+
+            var groups = await Http.GetFromJsonAsync<List<PayrollGroupDto>>("api/payrollgroups");
+            if (groups is not null && groups.Any())
+            {
+                _payrollGroups.AddRange(groups.OrderBy(x => x.Name));
+                _selectedPayrollGroupId = _payrollGroups.First().Id;
+                await LoadPayrollPeriods();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudieron cargar los grupos de nómina: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadPayrollPeriods()
+    {
+        _payrollPeriods.Clear();
+        _selectedPayrollPeriodId = Guid.Empty;
+
+        if (_selectedPayrollGroupId == Guid.Empty)
+            return;
+
+        try
+        {
+            var periods = await Http.GetFromJsonAsync<List<PayrollPeriodDto>>($"api/payrollgroups/{_selectedPayrollGroupId}/periods")
+                         ?? new List<PayrollPeriodDto>();
+
+            foreach (var period in periods)
+            {
+                period.Status = NormalizePeriodStatus(period.Status);
+
+                if (string.IsNullOrWhiteSpace(period.Name))
+                {
+                    period.Name = $"{period.StartDate:dd/MM} - {period.EndDate:dd/MM/yyyy}";
+                }
+
+                _payrollPeriods.Add(period);
+            }
+
+            var openPeriod = _payrollPeriods.FirstOrDefault(p => p.Status == "Open");
+            var fallbackPeriod = _payrollPeriods.FirstOrDefault();
+
+            if (openPeriod is not null)
+                _selectedPayrollPeriodId = openPeriod.Id;
+            else if (fallbackPeriod is not null)
+                _selectedPayrollPeriodId = fallbackPeriod.Id;
+
+            if (_table is not null)
+                await _table.ReloadServerData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudieron cargar los períodos: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnPayrollGroupChanged(Guid groupId)
+    {
+        _selectedPayrollGroupId = groupId;
+        await LoadPayrollPeriods();
+    }
+
+    private async Task OnPayrollPeriodChanged(Guid periodId)
+    {
+        _selectedPayrollPeriodId = periodId;
+
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+
+    private async Task ClearFilters()
+    {
+        _searchTerm = string.Empty;
+        _filterStatus = null;
+
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+
+    private async Task<TableData<PersonalActionListDto>> LoadServerData(
+        TableState state,
+        CancellationToken cancellationToken)
+    {
+        // GUARD CLAUSE: Si no hay período seleccionado, retornamos vacío sin llamar a la API
+        if (_selectedPayrollPeriodId == Guid.Empty)
+        {
+            return new TableData<PersonalActionListDto>
+            {
+                Items = new List<PersonalActionListDto>(),
+                TotalItems = 0
+            };
+        }
+
+        _isLoading = true;
+        try
+        {
+            // Construir la URL con parámetros de Query String (GET)
+            var url = $"api/personalactions?" +
+                      $"PayrollPeriodId={_selectedPayrollPeriodId}" +
+                      $"&PageNumber={state.Page + 1}" +
+                      $"&PageSize={state.PageSize}";
+
+            if (_selectedPayrollGroupId != Guid.Empty)
+                url += $"&PayrollGroupId={_selectedPayrollGroupId}";
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+                url += $"&SearchTerm={Uri.EscapeDataString(_searchTerm)}";
+
+            if (!string.IsNullOrWhiteSpace(_filterStatus))
+                url += $"&Status={_filterStatus}";
+
+            // LLAMADA GET en lugar de POST
+            var response = await Http.GetAsync(url, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Asegúrate de que tu backend devuelva PersonalActionPagedResultDto
+                var result = await response.Content.ReadFromJsonAsync<PersonalActionPagedResultDto>(cancellationToken: cancellationToken);
+
+                if (result != null)
+                {
+                    return new TableData<PersonalActionListDto>
+                    {
+                        Items = result.Items ?? new List<PersonalActionListDto>(),
+                        TotalItems = result.TotalCount
+                    };
+                }
+            }
+            else
+            {
+                // Si falla, mostramos el error para saber qué pasa
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error al cargar datos: {response.StatusCode}", Severity.Error);
+                Console.WriteLine($"Error API: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Excepción: {ex.Message}", Severity.Error);
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        return new TableData<PersonalActionListDto> { Items = new List<PersonalActionListDto>(), TotalItems = 0 };
+    }
+
+    private void EditAction(PersonalActionListDto item)
+    {
+        Navigation.NavigateTo($"/personal-actions/edit/{item.Id}");
+    }
+
+    private async Task DeleteAction(PersonalActionListDto item)
+    {
+        var label = !string.IsNullOrWhiteSpace(item.BatchReference)
+            ? $"el lote {item.BatchReference}"
+            : $"la acción de {item.EmployeeName}";
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"¿Deseas eliminar {label}?");
+
+        if (!confirmed)
+            return;
+
+        try
+        {
+            using var response = await Http.DeleteAsync($"api/personalactions/{item.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Acción eliminada correctamente.", Severity.Success);
+
+                if (_table is not null)
+                    await _table.ReloadServerData();
+
+                return;
+            }
+
+            var errorText = await ReadErrorAsync(response);
+            Snackbar.Add($"No se pudo eliminar la acción: {errorText}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al eliminar la acción: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExecuteAction(PersonalActionListDto item)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "¿Deseas ejecutar esta acción? Esta operación no se puede deshacer.");
+
+        if (!confirmed)
+            return;
+
+        try
+        {
+            using var response = await Http.PostAsync($"api/personalactions/{item.Id}/execute", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Acción ejecutada correctamente.", Severity.Success);
+
+                if (_table is not null)
+                    await _table.ReloadServerData();
+
+                return;
+            }
+
+            var errorText = await ReadErrorAsync(response);
+            Snackbar.Add($"No se pudo ejecutar la acción: {errorText}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al ejecutar la acción: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ViewDetail(PersonalActionListDto item)
+    {
+        _selectedAction = item;
+        _drawerOpen = true;
+    }
+
+    private void CloseDrawer()
+    {
+        _drawerOpen = false;
+        _selectedAction = null;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            await ApplyFilters();
+    }
+
+    private string GetNoRecordsMessage()
+    {
+        if (_selectedPayrollGroupId == Guid.Empty)
+            return "Selecciona un grupo de nómina para comenzar.";
+
+        if (_selectedPayrollPeriodId == Guid.Empty)
+            return "Selecciona un período de nómina para consultar acciones.";
+
+        return "No se encontraron acciones de personal con los filtros actuales.";
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            return string.IsNullOrWhiteSpace(content) ? response.ReasonPhrase ?? "Error no especificado" : content;
+        }
+        catch
+        {
+            return response.ReasonPhrase ?? "Error no especificado";
+        }
+    }
+
+    private static string NormalizePeriodStatus(string? status) => status?.Trim() switch
+    {
+        "0" => "Open",
+        "1" => "Closed",
+        "2" => "Processed",
+        _ => status?.Trim() ?? string.Empty
+    };
+
+    private static string NormalizeStatus(string? status) => status?.Trim() switch
+    {
+        "0" => "Pending",
+        "1" => "Approved",
+        "2" => "Executed",
+        "3" => "Rejected",
+        _ => status?.Trim() ?? string.Empty
+    };
+
+    private static string NormalizeActionType(string? type) => type?.Trim() switch
+    {
+        "0" => "SalaryChange",
+        "1" => "PositionChange",
+        "2" => "ContractChange",
+        "3" => "ShiftChange",
+        "4" => "CostCenterChange",
+        "5" => "Suspension",
+        "6" => "Reinstatement",
+        "7" => "Termination",
+        "8" => "MassSuspension",
+        "9" => "MassTermination",
+        _ => type?.Trim() ?? string.Empty
+    };
+
+    private static (Color color, string icon) GetStatusColorAndIcon(string status) => status switch
+    {
+        "Pending" => (Color.Warning, Icons.Material.Filled.Schedule),
+        "Approved" => (Color.Info, Icons.Material.Filled.ThumbUp),
+        "Executed" => (Color.Success, Icons.Material.Filled.CheckCircle),
+        "Rejected" => (Color.Error, Icons.Material.Filled.Cancel),
+        _ => (Color.Default, Icons.Material.Filled.HelpOutline)
+    };
+
+    private static string TranslateStatus(string status) => status switch
+    {
+        "Pending" => "Pendiente",
+        "Approved" => "Aprobado",
+        "Executed" => "Ejecutado",
+        "Rejected" => "Rechazado",
+        _ => string.IsNullOrWhiteSpace(status) ? "Sin estado" : status
+    };
+
+    private static string GetActionTypeName(string? type)
+    {
+        var normalized = NormalizeActionType(type);
+
+        return normalized switch
+        {
+            "SalaryChange" => "Cambio salarial",
+            "PositionChange" => "Cambio de puesto",
+            "ContractChange" => "Cambio de contrato",
+            "ShiftChange" => "Cambio de turno",
+            "CostCenterChange" => "Cambio de centro de costo",
+            "Suspension" => "Suspensión",
+            "MassSuspension" => "Suspensión masiva",
+            "Reinstatement" => "Reincorporación",
+            "Termination" => "Terminación",
+            "MassTermination" => "Terminación masiva",
+            _ => string.IsNullOrWhiteSpace(type) ? "Sin tipo" : type
+        };
+    }
+
+    public sealed class PayrollGroupDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public sealed class PayrollPeriodDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+}

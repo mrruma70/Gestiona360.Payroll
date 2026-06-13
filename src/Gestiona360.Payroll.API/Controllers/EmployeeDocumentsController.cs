@@ -1,4 +1,5 @@
 ﻿using Gestiona360.Payroll.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,6 +7,7 @@ namespace Gestiona360.Payroll.API.Controllers;
 
 [ApiController]
 [Route("api/employees/{id}/documents")]
+[Authorize]
 public class EmployeeDocumentsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

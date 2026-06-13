@@ -3,142 +3,173 @@ using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Gestiona360.Payroll.Application.Features.Employees.Queries;
-
-public class GetEmployeeByIdQueryHandler : IRequestHandler<GetEmployeeByIdQuery, EmployeeDetailDto>
+namespace Gestiona360.Payroll.Application.Features.Employees.Queries
 {
-    private readonly ApplicationDbContext _context;
-
-    public GetEmployeeByIdQueryHandler(ApplicationDbContext context)
+    public class GetEmployeeByIdQueryHandler : IRequestHandler<GetEmployeeByIdQuery, EmployeeDetailDto>
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
-    }
+        private readonly ApplicationDbContext _context;
 
-    public async Task<EmployeeDetailDto> Handle(GetEmployeeByIdQuery request, CancellationToken cancellationToken)
-    {
-        var employee = await _context.Employees
-            .Include(e => e.Company)
-            .Include(e => e.Branch)
-            .Include(e => e.CostCenter)
-            .Include(e => e.ContractType)
-            .Include(e => e.JobGrade)
-                .ThenInclude(jg => jg!.JobPosition)
-            .Include(e => e.Bank)
-            .Include(e => e.HealthProvider)
-            .Include(e => e.OccupationalRisk)
-            // ✅ NUEVO: Incluir asignaciones de turno para mostrar el turno actual
-            .Include(e => e.ShiftAssignments)
-                .ThenInclude(sa => sa.Shift)
-            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, cancellationToken);
-
-        if (employee == null)
-            throw new KeyNotFoundException($"Empleado con ID {request.EmployeeId} no encontrado.");
-
-        // ✅ Obtener el turno actual (el más reciente sin fecha fin o con fecha fin futura)
-        var currentShiftAssignment = employee.ShiftAssignments
-            .Where(sa => sa.EndDate == null || sa.EndDate > DateTime.UtcNow)
-            .OrderByDescending(sa => sa.StartDate)
-            .FirstOrDefault();
-
-        return new EmployeeDetailDto
+        public GetEmployeeByIdQueryHandler(ApplicationDbContext context)
         {
-            // === DATOS BÁSICOS ===
-            Id = employee.Id,
-            Code = employee.Code,
-            Identification = employee.Identification,
-            FirstName = employee.FirstName,
-            LastName = employee.LastName,
-            Email = employee.Email,
-            Phone = employee.Phone,
-            HireDate = employee.HireDate,
-            TerminationDate = employee.TerminationDate,
-            IsActive = employee.IsActive,
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
 
-            // === EMPRESA ===
-            CompanyId = employee.CompanyId,
-            CompanyName = employee.Company?.LegalName ?? "N/A",
+        public async Task<EmployeeDetailDto> Handle(GetEmployeeByIdQuery request, CancellationToken cancellationToken)
+        {
+            var employee = await _context.Employees
+                .Include(e => e.Company)
+                .Include(e => e.Branch)
+                .Include(e => e.CostCenter)
+                .Include(e => e.ContractType)
+                .Include(e => e.JobGrade)
+                    .ThenInclude(jg => jg!.JobPosition)
+                .Include(e => e.Bank)
+                .Include(e => e.HealthProvider)
+                .Include(e => e.OccupationalRisk)
+                .Include(e => e.PayrollGroup)
+                .Include(e => e.Department)      
+                .Include(e => e.Municipality)    
+                    .ThenInclude(m => m!.Department)
+                .Include(e => e.ShiftAssignments)
+                    .ThenInclude(sa => sa.Shift)
+                .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, cancellationToken);
 
-            // === SUCURSAL ===
-            BranchId = employee.BranchId,
-            BranchName = employee.Branch?.Name ?? "N/A",
-            BranchCode = employee.Branch?.Code ?? "N/A",
+            if (employee == null)
+                throw new KeyNotFoundException($"Empleado con ID {request.EmployeeId} no encontrado.");
 
-            // === CONTRATO ===
-            ContractTypeId = (int)employee.ContractTypeId,
-            ContractTypeName = employee.ContractType?.Name ?? "N/A",
+            // ✅ Obtener el turno actual
+            var currentShiftAssignment = employee.ShiftAssignments
+                .Where(sa => sa.EndDate == null || sa.EndDate > DateTime.UtcNow)
+                .OrderByDescending(sa => sa.StartDate)
+                .FirstOrDefault();
 
-            // === PUESTO/NIVEL ===
-            JobGradeId = employee.JobGradeId,
-            JobPositionName = employee.JobGrade?.JobPosition?.Name ?? "N/A",
-            JobGradeName = employee.JobGrade?.Name ?? "N/A",
+            return new EmployeeDetailDto
+            {
+                // === DATOS BÁSICOS ===
+                Id = employee.Id,
+                Code = employee.Code,
+                Identification = employee.Identification,
+                FirstName = employee.FirstName,
+                SecondName = employee.SecondName,           
+                LastName = employee.LastName,
+                SecondLastName = employee.SecondLastName,   
+                Email = employee.Email,
+                Phone = employee.Phone,
+                MobilePhone = employee.MobilePhone,         
+                HireDate = employee.HireDate,
+                FirstHireDate = employee.FirstHireDate,     
+                TerminationDate = employee.TerminationDate,
+                IsActive = employee.IsActive,
 
-            // === SALARIO ===
-            BaseSalary = employee.BaseSalary,
+                // === DATOS DEMOGRÁFICOS ===
+                BirthDate = employee.BirthDate,             
+                Gender = employee.Gender,                   
+                MaritalStatus = employee.MaritalStatus,     
 
-            // === PROVEEDOR SALUD ===
-            HealthProviderId = employee.HealthProviderId,
-            HealthProviderName = employee.HealthProvider?.Name ?? "No asignado",
+                // === EMPRESA ===
+                CompanyId = employee.CompanyId,
+                CompanyName = employee.Company?.LegalName ?? "N/A",
 
-            // === BANCO ===
-            BankId = employee.BankId,
-            BankName = employee.Bank?.Name ?? "No asignado",
-            BankAccountNumber = employee.BankAccountNumber ?? "N/A",
-            BankAccountType = employee.BankAccountType ?? "N/A",
+                // === SUCURSAL ===
+                BranchId = employee.BranchId,
+                BranchName = employee.Branch?.Name ?? "N/A",
+                BranchCode = employee.Branch?.Code ?? "N/A",
 
-            // === RIESGO OCUPACIONAL ===
-            OccupationalRiskId = employee.OccupationalRiskId,
-            OccupationalRiskName = employee.OccupationalRisk?.Name ?? "N/A",
+                // === DOMICILIO ===
+                Address = employee.Address,                         
+                DepartmentId = employee.DepartmentId,               
+                DepartmentName = employee.Department?.Name,         
+                MunicipalityId = employee.MunicipalityId,           
+                MunicipalityName = employee.Municipality?.Name,     
 
-            // === DOCUMENTOS ===
-            PhotoUrl = employee.PhotoUrl,
-            IdFrontUrl = employee.IdFrontUrl,
-            IdBackUrl = employee.IdBackUrl,
+                // === CONTACTO DE EMERGENCIA ===
+                EmergencyContactName = employee.EmergencyContactName,             
+                EmergencyContactPhone = employee.EmergencyContactPhone,           
+                EmergencyContactRelationship = employee.EmergencyContactRelationship, 
 
-            // === DATOS FISCALES ===
-            NORUC = employee.NORUC ?? string.Empty,
-            NOINSS = employee.NOINSS ?? string.Empty,
+                // === CONTRATO ===
+                ContractTypeId = employee.ContractTypeId,
+                ContractTypeName = employee.ContractType?.Name ?? "N/A",
 
-            // === ESTADO Y SUSPENSIÓN ===
-            EmploymentStatus = employee.EmploymentStatus,
-            SuspensionStartDate = employee.SuspensionStartDate,
-            SuspensionEndDate = employee.SuspensionEndDate,
-            SuspensionJustification = employee.SuspensionJustification,
-            MitrabAuthorizationNumber = employee.MitrabAuthorizationNumber,
+                // === PUESTO/NIVEL ===
+                JobGradeId = employee.JobGradeId,
+                JobPositionName = employee.JobGrade?.JobPosition?.Name ?? "N/A",
+                JobGradeName = employee.JobGrade?.Name ?? "N/A",
 
-            // === REINGRESO ===
-            PreviousEmployeeId = employee.PreviousEmployeeId,
+                // === SALARIO ===
+                BaseSalary = employee.BaseSalary,
 
-            // === PERÍODO DE PRUEBA ===
-            ProbationStartDate = employee.ProbationStartDate,
-            ProbationEndDate = employee.ProbationEndDate,
-            // ✅ Propiedad calculada
-            IsOnProbation = employee.ProbationStartDate.HasValue &&
-                            DateTime.UtcNow >= employee.ProbationStartDate.Value &&
-                            (!employee.ProbationEndDate.HasValue || DateTime.UtcNow <= employee.ProbationEndDate.Value),
+                // === PROVEEDOR SALUD ===
+                HealthProviderId = employee.HealthProviderId,
+                HealthProviderName = employee.HealthProvider?.Name ?? "No asignado",
 
-            // === CONDICIONES ESPECIALES ===
-            IsTrustEmployee = employee.IsTrustEmployee,
-            BenefitsInKindValue = employee.BenefitsInKindValue,
-            BenefitsInKindDescription = employee.BenefitsInKindDescription,
+                // === BANCO ===
+                BankId = employee.BankId,
+                BankName = employee.Bank?.Name ?? "No asignado",
+                BankAccountNumber = employee.BankAccountNumber ?? "N/A",
+                BankAccountType = employee.BankAccountType ?? "N/A",
+                BankBeneficiaryName = employee.BankBeneficiaryName,   
 
-            // === TRABAJADOR EXTRANJERO ===
-            Nationality = employee.Nationality,
-            WorkPermitNumber = employee.WorkPermitNumber,
-            WorkPermitExpirationDate = employee.WorkPermitExpirationDate,
+                // === RIESGO OCUPACIONAL ===
+                OccupationalRiskId = employee.OccupationalRiskId,
+                OccupationalRiskName = employee.OccupationalRisk?.Name ?? "N/A",
 
-            // === NOTAS ===
-            Notes = employee.Notes,
+                // === CENTRO DE COSTO ===
+                CostCenterId = employee.CostCenterId,
+                CostCenterName = employee.CostCenter?.Name ?? "No asignado",
+                CostCenterCode = employee.CostCenter?.Code ?? "",
 
-            // === TURNO ACTUAL (NUEVO) ===
-            CurrentShiftName = currentShiftAssignment?.Shift?.Name,
-            CurrentShiftSchedule = currentShiftAssignment != null && currentShiftAssignment.Shift != null
-                ? $"{currentShiftAssignment.Shift.StartTime:hh\\:mm} - {currentShiftAssignment.Shift.EndTime:hh\\:mm}"
-                : null,
-            ShiftAssignmentStartDate = currentShiftAssignment?.StartDate,
+                // === GRUPO DE NÓMINA ===
+                PayrollGroupId = employee.PayrollGroupId,
+                PayrollGroupName = employee.PayrollGroup?.Name ?? "No asignado",
 
-            CostCenterId = employee.CostCenterId,
-            CostCenterName = employee.CostCenter?.Name ?? "No asignado",
-            CostCenterCode = employee.CostCenter?.Code ?? ""
-        };
+                // === DOCUMENTOS ===
+                PhotoUrl = employee.PhotoUrl,
+                IdFrontUrl = employee.IdFrontUrl,
+                IdBackUrl = employee.IdBackUrl,
+
+                // === DATOS FISCALES ===
+                NORUC = employee.NORUC ?? string.Empty,
+                NOINSS = employee.NOINSS ?? string.Empty,
+
+                // === ESTADO Y SUSPENSIÓN ===
+                EmploymentStatus = employee.EmploymentStatus.ToString(),
+                SuspensionStartDate = employee.SuspensionStartDate,
+                SuspensionEndDate = employee.SuspensionEndDate,
+                SuspensionJustification = employee.SuspensionJustification,
+                MitrabAuthorizationNumber = employee.MitrabAuthorizationNumber,
+
+                // === REINGRESO ===
+                PreviousEmployeeId = employee.PreviousEmployeeId,
+
+                // === PERÍODO DE PRUEBA ===
+                ProbationStartDate = employee.ProbationStartDate,
+                ProbationEndDate = employee.ProbationEndDate,
+                IsOnProbation = employee.ProbationStartDate.HasValue &&
+                                DateTime.UtcNow >= employee.ProbationStartDate.Value &&
+                                (!employee.ProbationEndDate.HasValue || DateTime.UtcNow <= employee.ProbationEndDate.Value),
+
+                // === CONDICIONES ESPECIALES ===
+                IsTrustEmployee = employee.IsTrustEmployee,
+                UsesTimeClock = employee.UsesTimeClock,             
+                BenefitsInKindValue = employee.BenefitsInKindValue,
+                BenefitsInKindDescription = employee.BenefitsInKindDescription,
+
+                // === TRABAJADOR EXTRANJERO ===
+                Nationality = employee.Nationality,
+                WorkPermitNumber = employee.WorkPermitNumber,
+                WorkPermitExpirationDate = employee.WorkPermitExpirationDate,
+
+                // === NOTAS ===
+                Notes = employee.Notes,
+
+                // === TURNO ACTUAL ===
+                CurrentShiftName = currentShiftAssignment?.Shift?.Name,
+                CurrentShiftSchedule = currentShiftAssignment != null && currentShiftAssignment.Shift != null
+                    ? $"{currentShiftAssignment.Shift.StartTime:hh\\:mm} - {currentShiftAssignment.Shift.EndTime:hh\\:mm}"
+                    : null,
+                ShiftAssignmentStartDate = currentShiftAssignment?.StartDate
+            };
+        }
     }
 }

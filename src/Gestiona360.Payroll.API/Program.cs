@@ -1,16 +1,21 @@
+Ôªøusing System.Security.Claims;
+using System.Text;
 using Gestiona360.Payroll.Application;
-using Gestiona360.Payroll.Application.Features.Employees.Exports;
 using Gestiona360.Payroll.Domain.Entities;
 using Gestiona360.Payroll.Infrastructure.Identity;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using Gestiona360.Payroll.Infrastructure.Persistence.Seeding;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 
-// API
 var builder = WebApplication.CreateBuilder(args);
 
+// ============================================
 // CORS
+// ============================================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorClient", policy =>
@@ -18,32 +23,77 @@ builder.Services.AddCors(options =>
         policy.WithOrigins("http://localhost:5063", "https://localhost:7141")
               .AllowAnyMethod()
               .AllowAnyHeader()
+              .AllowCredentials()
               .WithExposedHeaders("Content-Disposition");
-
     });
 });
 
-// Registrar Persistencia (que ahora configura internamente el DbContext e Identity)
-builder.Services.AddApplication();                
+// ============================================
+// SERVICIOS DE LA APLICACI√ìN
+// ============================================
+builder.Services.AddApplication();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
 
 
-//builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
-//builder.Services.AddScoped<ICatalogService, CatalogService>();
+var jwtKey = builder.Configuration["Jwt:Key"];
+var keyBytes = Convert.FromBase64String(jwtKey);
+var signingKey = new SymmetricSecurityKey(keyBytes);
+Console.WriteLine($"Clave decodificada: {BitConverter.ToString(keyBytes)}");
+Console.WriteLine($"Longitud: {keyBytes.Length} bytes"); // Debe ser 32
+// ============================================
+// JWT AUTHENTICATION
+// ============================================
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = signingKey,
+        //IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ClockSkew = TimeSpan.Zero,
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role
+    };
 
-//builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(MediatRMarker).Assembly));
-//builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"‚ùå JWT Error: {context.Exception.Message}");
+            if (context.Exception.InnerException != null)
+                Console.WriteLine($"   Inner: {context.Exception.InnerException.Message}");
+            Console.WriteLine($"   StackTrace: {context.Exception.StackTrace}");
+            return Task.CompletedTask;
+        }
+    };
+});
 
+builder.Services.AddAuthorization();
 
-
-builder.Services.AddControllers();
+// ============================================
+// OPENAPI NATIVO DE .NET 10 (Reemplaza Swagger)
+// ============================================
 builder.Services.AddOpenApi();
 
+// ============================================
+// CONTROLLERS
+// ============================================
+builder.Services.AddControllers();
+
+// ============================================
+// APLICACI√ìN
+// ============================================
 var app = builder.Build();
 
-
-// Bloque de inicializaciÛn de Base de Datos en el ciclo de vida del Startup
+// Migrar BD
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -54,44 +104,53 @@ using (var scope = app.Services.CreateScope())
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        // 1. Aplica migraciones pendientes de forma autom·tica sin bloquear la base de datos
         await context.Database.MigrateAsync();
-
-        // Sembrar roles y usuario administrador
         await ApplicationDbInitializer.InitializeIdentityAsync(context, userManager, roleManager, logger);
-
-        // 2. Ejecuta el sembrado de datos por defecto si la base est· vacÌa
         await DbInitializer.SeedAsync(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "OcurriÛ un error fatal al migrar o sembrar la base de datos.");
+        logger.LogError(ex, "Error fatal al migrar o sembrar BD");
     }
 }
 
+// ============================================
+// MIDDLEWARE PIPELINE
+// https://localhost:7119/scalar/v1
+// https://localhost:7119/openapi/v1.json
+// ============================================
 if (app.Environment.IsDevelopment())
 {
-    //using (var scope = app.Services.CreateScope())
-    //{
-    //    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    //    dbContext.Database.Migrate(); // ? esto aplica migraciones pendientes autom·ticamente
-
-    //    // 2. Ejecuta el sembrado de datos por defecto si la base est· vacÌa
-    //    await DbInitializer.SeedAsync(dbContext);
-    //}
-    app.MapOpenApi();
+    app.MapOpenApi(); // Endpoint: /openapi/v1.json
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("Gestiona 360 - Payroll API");
+        options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
+    });
 }
 
-app.UseStaticFiles();
+// ‚úÖ ORDEN CORRECTO DEL PIPELINE
+app.UseHttpsRedirection();      // 1. PRIMERO: Redirecci√≥n HTTPS
+app.UseStaticFiles();           // 2. Archivos est√°ticos
+app.UseCors("AllowBlazorClient"); // 3. CORS DESPU√âS de HTTPS
 
-app.UseCors("AllowBlazorClient");
-app.UseHttpsRedirection();
+// Middleware de logging (opcional)
+app.Use(async (context, next) =>
+{
+    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+    Console.WriteLine($"üîê Header recibido: {authHeader}");
+    if (!string.IsNullOrEmpty(authHeader))
+    {
+        var token = authHeader.Substring("Bearer ".Length);
+        Console.WriteLine($"Token: {token.Substring(0, Math.Min(50, token.Length))}...");
+    }
+    await next();
+});
 
-// El orden de los middlewares es crucial
+// 4. Autenticaci√≥n y Autorizaci√≥n
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();

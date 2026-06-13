@@ -30,14 +30,14 @@ namespace Gestiona360.Payroll.Application.Contracts.DTOs.Employees
         // Propiedad calculada para UI
         public string FullName => $"{FirstName} {LastName}";
 
-        // ✅ NUEVAS propiedades para indicadores
+        // propiedades para indicadores
         public EmploymentStatus EmploymentStatus { get; set; }
         public bool IsOnProbation { get; set; }
         public bool IsTrustEmployee { get; set; }
         public string? Nationality { get; set; }
         public Guid? PreviousEmployeeId { get; set; }
 
-        // ✅ CAMPOS ADICIONALES ÚTILES (que faltaban)
+        //  CAMPOS ADICIONALES ÚTILES (que faltaban)
         public bool IsForeignWorker => !string.IsNullOrEmpty(Nationality);
         public bool IsRehire => PreviousEmployeeId.HasValue;
         public DateTime? ProbationEndDate { get; set; }
@@ -46,8 +46,20 @@ namespace Gestiona360.Payroll.Application.Contracts.DTOs.Employees
         public string CostCenterName { get; set; } = string.Empty;
         public string CostCenterCode { get; set; } = string.Empty;
 
+        public decimal BaseSalary { get; set; }
+        public string ShiftName { get; set; } = string.Empty;
 
-        // ✅ Propiedad calculada para mostrar el estado como texto
+        public int? BankId { get; set; }
+        public string BankName { get; set; } = string.Empty;
+        public string BankAccountNumber { get; set; } = string.Empty;
+        public Guid? HealthProviderId { get; set; }
+        public string HealthProviderName { get; set; } = string.Empty;
+
+        //  Grupo de Nómina
+        public Guid PayrollGroupId { get; set; }
+        public string PayrollGroupName { get; set; } = string.Empty;
+
+        // Propiedad calculada para mostrar el estado como texto
         public string EmploymentStatusName => EmploymentStatus switch
         {
             EmploymentStatus.Active => "Activo",

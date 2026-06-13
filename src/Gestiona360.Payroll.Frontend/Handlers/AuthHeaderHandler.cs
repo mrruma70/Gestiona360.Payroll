@@ -1,0 +1,19 @@
+﻿using Blazored.LocalStorage;
+using System.Net.Http.Headers;
+
+public class AuthHeaderHandler : DelegatingHandler
+{
+    private readonly ILocalStorageService _localStorage;
+    public AuthHeaderHandler(ILocalStorageService localStorage) => _localStorage = localStorage;
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var token = await _localStorage.GetItemAsync<string>("authToken");
+        if (!string.IsNullOrEmpty(token))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        // Si no hay token, simplemente no se añade header -> perfecto para login
+        return await base.SendAsync(request, cancellationToken);
+    }
+}

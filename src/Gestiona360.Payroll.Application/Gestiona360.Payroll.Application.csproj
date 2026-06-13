@@ -5,20 +5,28 @@
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="14.1.0" />
+    <PackageReference Include="QRCoder" Version="1.5.1" />
+    <PackageReference Include="Scrutor" Version="7.0.0" />
     <PackageReference Include="SqlKata" Version="4.0.1" />
     <PackageReference Include="SqlKata.Execution" Version="4.0.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Gestiona360.Payroll.Application.Abstractions\Gestiona360.Payroll.Application.Abstractions.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Application.Abstractions\Gestiona360.Payroll.Application.Abstractions.csproj" />
     <ProjectReference Include="..\Gestiona360.Payroll.API.Contracts\Gestiona360.Payroll.API.Contracts.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Application.Abstractions\Gestiona360.Payroll.Application.Abstractions.csproj" />
     <ProjectReference Include="..\Gestiona360.Payroll.Domain\Gestiona360.Payroll.Domain.csproj" />
     <ProjectReference Include="..\Gestiona360.Payroll.Application.Contracts\Gestiona360.Payroll.Application.Contracts.csproj" />
+    <ProjectReference Include="..\Gestiona360.Payroll.Infrastructure.Identity\Gestiona360.Payroll.Infrastructure.Identity.csproj" />
     <ProjectReference Include="..\Gestiona360.Payroll.Infrastructure.Persistence\Gestiona360.Payroll.Infrastructure.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Common\" />
+  </ItemGroup>
+
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

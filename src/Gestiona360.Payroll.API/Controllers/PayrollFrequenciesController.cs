@@ -1,16 +1,16 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Gestiona360.Payroll.API.Contracts.Common;
-using Gestiona360.Payroll.Application.Commands;
-using Gestiona360.Payroll.Application.Commands.PayrollFrequency;
+﻿using Gestiona360.Payroll.API.Contracts.Common;
 using Gestiona360.Payroll.Application.Contracts.DTOs;
+using Gestiona360.Payroll.Application.Features.PayrollFrequency;
 using Gestiona360.Payroll.Application.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class PayrollFrequenciesController : ControllerBase
     {
         private readonly IMediator _mediator;

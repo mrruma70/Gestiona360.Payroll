@@ -26,6 +26,9 @@ public class GenerateEmployeePdfQueryHandler : IRequestHandler<GenerateEmployeeP
             .Include(e => e.Bank)
             .Include(e => e.HealthProvider)
             .Include(e => e.OccupationalRisk)
+             .Include(e => e.PayrollGroup)
+              .Include(e => e.Department)         
+                .Include(e => e.Municipality)     
             .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, cancellationToken);
 
         if (employee == null)

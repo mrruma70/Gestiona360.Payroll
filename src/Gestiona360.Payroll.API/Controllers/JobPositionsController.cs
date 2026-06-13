@@ -1,6 +1,7 @@
 ﻿using Gestiona360.Payroll.Application.Contracts.DTOs;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class JobPositionsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

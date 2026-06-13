@@ -1,5 +1,6 @@
 ﻿using Gestiona360.Payroll.Application.Features.Employees.Commands;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,7 @@ namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/employees")]
+    [Authorize]
     public class EmployeeCatalogsController : ControllerBase
     {
         private readonly IMediator _mediator;

@@ -1,6 +1,7 @@
 ﻿using ClosedXML.Excel;
 using Gestiona360.Payroll.Application.Contracts.DTOs;
 using Gestiona360.Payroll.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/reports")]
+    [Authorize]
     public class IRReportsController : ControllerBase
     {
 

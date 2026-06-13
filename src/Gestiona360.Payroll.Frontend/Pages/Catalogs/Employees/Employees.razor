@@ -1,4 +1,6 @@
 ﻿@page "/employees"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
 @using Gestiona360.Payroll.Application.Contracts.DTOs
 @using Gestiona360.Payroll.Domain.Shared.Frontend
@@ -118,6 +120,18 @@
             </MudSelect>
         </MudItem>
 
+        @* ✅ Filtro por Grupo de Nómina *@
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="Guid?" @bind-Value="_filterPayrollGroupId" Label="💼 Grupo de Nómina"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="Guid?" Value="null">Todos</MudSelectItem>
+                @foreach (var pg in _payrollGroups)
+                {
+                    <MudSelectItem T="Guid?" Value="@pg.Id">@pg.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
         <!-- Filtros avanzados - Fila 2 (NUEVOS) -->
         <MudItem xs="12" sm="6" md="3">
             <MudSelect T="bool?" @bind-Value="_filterIsTrustEmployee" Label="👔 Confianza"
@@ -188,6 +202,7 @@
         <MudTh>Puesto / Nivel</MudTh>
         <MudTh>Sucursal</MudTh>
         <MudTh>Centro de Costo</MudTh>
+        <MudTh>Grupo Nómina</MudTh>
         <MudTh>Fecha Ingreso</MudTh>
         <MudTh Style="width: 120px;">Estado</MudTh>
         <MudTh Style="width: 80px;">Indicadores</MudTh>
@@ -220,6 +235,11 @@
         <MudTd DataLabel="Centro de Costo">
             <MudText Typo="Typo.body2">@context.CostCenterName</MudText>
             <MudText Typo="Typo.caption">@context.CostCenterCode</MudText>
+        </MudTd>
+        <MudTd DataLabel="Grupo Nómina">
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                @context.PayrollGroupName
+            </MudChip>
         </MudTd>
         <MudTd DataLabel="Fecha Ingreso">
             <MudText Typo="Typo.body2">@context.HireDate.ToString("dd/MM/yyyy")</MudText>
@@ -323,6 +343,15 @@
     private List<ContractTypeDto> _contractTypes = new();
     private List<JobPositionDto> _jobPositions = new();
 
+    private List<PayrollGroupDto> _payrollGroups = new();
+    private Guid? _filterPayrollGroupId;
+
+    public class PayrollGroupDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCatalogs();
@@ -336,6 +365,7 @@
             _branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/branches/active") ?? new();
             _contractTypes = await Http.GetFromJsonAsync<List<ContractTypeDto>>("api/contracttypes/all") ?? new();
             _jobPositions = await Http.GetFromJsonAsync<List<JobPositionDto>>("api/jobpositions/all") ?? new();
+            _payrollGroups = await Http.GetFromJsonAsync<List<PayrollGroupDto>>("api/payrollgroups/active") ?? new();
         }
         catch (Exception ex)
         {
@@ -358,9 +388,10 @@
                         $"&jobPositionId={_filterJobPositionId}" +
                         $"&employmentStatus={_filterEmploymentStatus}" +
                         $"&isTrustEmployee={_filterIsTrustEmployee}" +
-                        $"&isForeign={_filterIsForeign}" +
-                        $"&onProbation={_filterOnProbation}" +
-                        $"&isRehire={_filterIsRehire}";
+                        $"&isForeignWorker={_filterIsForeign}" +
+                        $"&isOnProbation={_filterOnProbation}" +
+                        $"&isRehire={_filterIsRehire}" +
+                        $"&payrollGroupId={_filterPayrollGroupId}";  // ✅ NUEVO
 
             var result = await Http.GetFromJsonAsync<EmployeeSearchResultDto>(query);
             _employees = result?.Employees ?? new();
@@ -389,6 +420,7 @@
         _filterIsForeign = null;
         _filterOnProbation = null;
         _filterIsRehire = null;
+        _filterPayrollGroupId = null;  // ✅ NUEVO
         await ApplyFilters();
     }
 
@@ -453,9 +485,10 @@
                         $"&jobPositionId={_filterJobPositionId}" +
                         $"&employmentStatus={_filterEmploymentStatus}" +
                         $"&isTrustEmployee={_filterIsTrustEmployee}" +
-                        $"&isForeign={_filterIsForeign}" +
-                        $"&onProbation={_filterOnProbation}" +
-                        $"&isRehire={_filterIsRehire}";
+                        $"&isForeignWorker={_filterIsForeign}" +
+                        $"&isOnProbation={_filterOnProbation}" +
+                        $"&isRehire={_filterIsRehire}" +
+                        $"&payrollGroupId={_filterPayrollGroupId}";  // ✅ NUEVO
 
             var response = await Http.GetAsync(query);
             if (response.IsSuccessStatusCode)

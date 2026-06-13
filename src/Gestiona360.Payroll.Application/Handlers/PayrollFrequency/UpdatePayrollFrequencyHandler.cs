@@ -1,6 +1,6 @@
 ﻿using Gestiona360.Payroll.Application.Abstractions.Repositories;
-using Gestiona360.Payroll.Application.Commands;
 using Gestiona360.Payroll.Application.Contracts.DTOs;
+using Gestiona360.Payroll.Application.Features.PayrollFrequency;
 using MediatR;
 
 namespace Gestiona360.Payroll.Application.Handlers.PayrollFrequency;

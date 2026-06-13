@@ -1,4 +1,5 @@
-﻿using Gestiona360.Payroll.Domain.Entities;
+﻿using Gestiona360.Payroll.Application.Contracts.Common.Validators;
+using Gestiona360.Payroll.Domain.Entities;
 using Gestiona360.Payroll.Domain.Shared.Frontend;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
@@ -9,10 +10,12 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
     public class CreateEmployeeCommandHandler : IRequestHandler<CreateEmployeeCommand, Guid>
     {
         private readonly ApplicationDbContext _context;
+    
 
         public CreateEmployeeCommandHandler(ApplicationDbContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            
         }
 
         public async Task<Guid> Handle(CreateEmployeeCommand command, CancellationToken cancellationToken)
@@ -22,27 +25,57 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
             if (!request.HireDate.HasValue)
                 throw new InvalidOperationException("La fecha de ingreso es requerida.");
 
-            // ✅ VALIDACIÓN DE CÉDULA CON DETECCIÓN DE REINGRESO
+            // ═══════════════════════════════════════════════════════════════
+            // VALIDACIONES ADICIONALES DE CAMPOS OBLIGATORIOS
+            // ═══════════════════════════════════════════════════════════════
+            if (!request.BirthDate.HasValue)
+                throw new InvalidOperationException("La fecha de nacimiento es obligatoria.");
+
+            if (string.IsNullOrWhiteSpace(request.MobilePhone))
+                throw new InvalidOperationException("El número de celular es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.Address))
+                throw new InvalidOperationException("La dirección del domicilio es obligatoria.");
+
+            if (!request.DepartmentId.HasValue)
+                throw new InvalidOperationException("El departamento es obligatorio.");
+
+            if (!request.MunicipalityId.HasValue)
+                throw new InvalidOperationException("El municipio es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.EmergencyContactName))
+                throw new InvalidOperationException("El nombre del contacto de emergencia es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.EmergencyContactPhone))
+                throw new InvalidOperationException("El teléfono del contacto de emergencia es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.EmergencyContactRelationship))
+                throw new InvalidOperationException("El parentesco del contacto de emergencia es obligatorio.");
+
+            if (!CedulaValidator.EsValida(request.Identification))
+                throw new InvalidOperationException("La cédula ingresada no es válida según el algoritmo de verificación nicaragüense.");
+
+            // ═══════════════════════════════════════════════════════════════
+            // VALIDACIÓN DE CÉDULA CON DETECCIÓN DE REINGRESO
+            // ═══════════════════════════════════════════════════════════════
             Guid? previousEmployeeId = null;
             var existingEmployee = await _context.Employees
                 .FirstOrDefaultAsync(e => e.Identification == request.Identification, cancellationToken);
 
             if (existingEmployee != null)
             {
-                // Si existe un empleado con la misma cédula...
                 if (existingEmployee.EmploymentStatus != EmploymentStatus.Terminated)
                 {
-                    // ❌ No es reingreso: el empleado está activo o suspendido → duplicado real
                     throw new InvalidOperationException(
                         $"Ya existe un empleado activo/suspendido con la cédula {request.Identification}. " +
                         $"Solo se permite reingreso si el empleado anterior fue terminado/finiquitado.");
                 }
-
-                // ✅ Es un reingreso: el empleado anterior fue terminado
                 previousEmployeeId = existingEmployee.Id;
             }
 
-            // Validar que el JobGrade existe y está activo
+            // ═══════════════════════════════════════════════════════════════
+            // VALIDAR PUESTO/NIVEL
+            // ═══════════════════════════════════════════════════════════════
             var jobGrade = await _context.JobGrades
                 .Include(jg => jg.JobPosition)
                 .FirstOrDefaultAsync(jg => jg.Id == request.JobGradeId && jg.IsActive, cancellationToken);
@@ -50,7 +83,9 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
             if (jobGrade == null)
                 throw new InvalidOperationException("El puesto/nivel seleccionado no existe o está inactivo");
 
-            // Validar salario mínimo
+            // ═══════════════════════════════════════════════════════════════
+            // VALIDAR SALARIO MÍNIMO
+            // ═══════════════════════════════════════════════════════════════
             if (jobGrade.JobPosition.MinimumWageId.HasValue)
             {
                 var minWage = await _context.MinimumWages
@@ -60,10 +95,31 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
                     throw new InvalidOperationException($"El salario debe ser mayor o igual al mínimo legal: C$ {minWage.MonthlyAmountNIO:N2}");
             }
 
-            // Generar código de empleado
+            // ═══════════════════════════════════════════════════════════════
+            // VALIDAR DEPARTAMENTO Y MUNICIPIO
+            // ═══════════════════════════════════════════════════════════════
+            var department = await _context.Departments
+                .FirstOrDefaultAsync(d => d.Id == request.DepartmentId && d.IsActive, cancellationToken);
+            if (department == null)
+                throw new InvalidOperationException("El departamento seleccionado no existe o está inactivo.");
+
+            var municipality = await _context.Municipalities
+                .FirstOrDefaultAsync(m => m.Id == request.MunicipalityId && m.IsActive && m.DepartmentId == request.DepartmentId, cancellationToken);
+            if (municipality == null)
+                throw new InvalidOperationException("El municipio seleccionado no existe, está inactivo o no pertenece al departamento.");
+
+            // ═══════════════════════════════════════════════════════════════
+            // GENERAR CÓDIGO DE EMPLEADO
+            // ═══════════════════════════════════════════════════════════════
             var employeeCode = await GenerateEmployeeCode(cancellationToken);
 
-            // ✅ CÁLCULO AUTOMÁTICO DEL PERÍODO DE PRUEBA (Art. 27 Ley 185)
+            // GENERAR Y GUARDAR CÓDIGO DE BARRAS
+            // Asumiendo que tu entidad Employee tiene una propiedad llamada CodigoBarra o BarcodeData
+            //var barcodePayload = _barcodeService.GeneratePayload(employeeCode, request.CompanyId);
+
+            // ═══════════════════════════════════════════════════════════════
+            // CÁLCULO AUTOMÁTICO DEL PERÍODO DE PRUEBA
+            // ═══════════════════════════════════════════════════════════════
             DateTime? probationStartDate = null;
             DateTime? probationEndDate = null;
 
@@ -76,17 +132,47 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
                 probationEndDate = request.HireDate.Value.AddDays(contractType.ProbationDays);
             }
 
-            // ✅ CREAR EMPLEADO CON TODOS LOS CAMPOS
+            // ═══════════════════════════════════════════════════════════════
+            // CREAR EMPLEADO CON TODOS LOS CAMPOS
+            // ═══════════════════════════════════════════════════════════════
             var employee = new Employee
             {
-                // Campos básicos
+                // Identificación
                 Code = employeeCode,
                 Identification = request.Identification,
                 FirstName = request.FirstName,
+                SecondName = request.SecondName,
                 LastName = request.LastName,
+                SecondLastName = request.SecondLastName,
+                //CodigoBarra = barcodePayload,
+
+                // Datos demográficos
+                BirthDate = request.BirthDate,
+                Gender = request.Gender,
+                MaritalStatus = request.MaritalStatus,
+
+                // Contacto
                 Email = request.Email,
                 Phone = request.Phone,
+                MobilePhone = request.MobilePhone,
+
+                // Domicilio
+                Address = request.Address,
+                DepartmentId = request.DepartmentId,
+                MunicipalityId = request.MunicipalityId,
+
+                // Contacto de emergencia
+                EmergencyContactName = request.EmergencyContactName,
+                EmergencyContactPhone = request.EmergencyContactPhone,
+                EmergencyContactRelationship = request.EmergencyContactRelationship,
+
+                // Datos fiscales
+                NORUC = request.NORUC,
+                NOINSS = request.NOINSS,
+
+                // Contratación
                 HireDate = request.HireDate.Value,
+                FirstHireDate = request.FirstHireDate ?? request.HireDate.Value,
                 CompanyId = request.CompanyId,
                 BranchId = request.BranchId,
                 ContractTypeId = request.ContractTypeId,
@@ -94,35 +180,41 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Commands
                 HealthProviderId = request.HealthProviderId,
                 OccupationalRiskId = jobGrade.JobPosition.OccupationalRiskId,
                 BaseSalary = request.BaseSalary,
+                CostCenterId = request.CostCenterId,
+                PayrollGroupId = request.PayrollGroupId,
+
+                // Datos bancarios
                 BankId = request.BankId,
                 BankAccountNumber = request.BankAccountNumber,
                 BankAccountType = request.BankAccountType,
+                BankBeneficiaryName = request.BankBeneficiaryName,
 
-                // ✅ NUEVOS CAMPOS EDITABLES
-                NORUC = request.NORUC,
-                NOINSS = request.NOINSS,
+                // Condiciones especiales
                 IsTrustEmployee = request.IsTrustEmployee,
+                UsesTimeClock = request.UsesTimeClock,
+                BenefitsInKindValue = request.BenefitsInKindValue,
+                BenefitsInKindDescription = request.BenefitsInKindDescription,
+
+                // Trabajador extranjero
                 Nationality = request.Nationality,
                 WorkPermitNumber = request.WorkPermitNumber,
                 WorkPermitExpirationDate = request.WorkPermitExpirationDate,
-                BenefitsInKindValue = request.BenefitsInKindValue,
-                BenefitsInKindDescription = request.BenefitsInKindDescription,
-                Notes = request.Notes,
 
-                // ✅ ESTADO INICIAL (siempre Active al crear)
+                // Estado
                 EmploymentStatus = EmploymentStatus.Active,
+                IsActive = true,
 
-                // ✅ REINGRESO (si aplica)
+                // Reingreso
                 PreviousEmployeeId = previousEmployeeId,
 
-                // ✅ PERÍODO DE PRUEBA (calculado automáticamente)
+                // Período de prueba
                 ProbationStartDate = probationStartDate,
                 ProbationEndDate = probationEndDate,
 
-                CostCenterId = request.CostCenterId,
+                // Notas
+                Notes = request.Notes,
 
-                // ✅ CONTROL
-                IsActive = true,
+                // Auditoría
                 CreatedAt = DateTime.UtcNow
             };
 

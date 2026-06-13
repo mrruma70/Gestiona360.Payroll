@@ -296,3 +296,20 @@ body {
     ::-webkit-scrollbar-thumb:hover {
         background: #FFD700;
     }
+
+
+.form-section {
+    background-color: #2d2d2d !important;
+}
+
+    .form-section .mud-paper {
+        background-color: transparent !important;
+    }
+
+    .form-section .mud-input-outlined {
+        background: #3a3a3a !important;
+    }
+
+    .form-section .mud-input-label {
+        color: #FFD700 !important;
+    }

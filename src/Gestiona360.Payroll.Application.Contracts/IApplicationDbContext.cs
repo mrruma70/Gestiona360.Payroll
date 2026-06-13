@@ -57,9 +57,13 @@ namespace Gestiona360.Payroll.Application.Contracts
         DbSet<INATECConfig> INATECConfigs { get; set; }
         DbSet<IrTaxSchedule> IrTaxSchedules { get; set; }
         DbSet<MinimumWageSchedule> MinimumWageSchedules { get; set; }
+        DbSet<MedicalLeave> MedicalLeaves { get; set; }
 
-        //DbSet<ReportDefinition> ReportDefinitions { get; set; }
-        //DbSet<ReportParameter> ReportParameters { get; set; }
+        DbSet<Department> Departments { get; set; }
+        DbSet<Municipality> Municipalities { get; set; }
+        DbSet<Neighborhood> Neighborhoods { get; set; }
+
+        DbSet<UserRefreshToken> UserRefreshTokens { get; set; }
 
         // Métodos auxiliares
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

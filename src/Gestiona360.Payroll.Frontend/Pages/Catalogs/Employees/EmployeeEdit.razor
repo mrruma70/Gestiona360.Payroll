@@ -3,9 +3,12 @@
 @using Gestiona360.Payroll.Application.Contracts.Requests
 @using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
 
 <PageTitle>Editar Empleado | Gestiona360</PageTitle>
 
@@ -18,34 +21,111 @@
 else if (_employee != null)
 {
     <MudText Typo="Typo.h5" Class="mb-4">✏️ Editar Empleado: <strong>@_employee.FirstName @_employee.LastName</strong></MudText>
-
+    @if (_isAdmin)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.AdminPanelSettings">
+            <MudText Typo="Typo.body2">
+                <strong>🔓 Modo Administrador:</strong> Tiene permisos para modificar campos sensibles como la cédula de identidad.
+                Cualquier cambio quedará registrado en el historial de auditoría.
+            </MudText>
+        </MudAlert>
+    }
     <MudPaper Class="pa-4" Elevation="2">
         <MudForm @ref="_form" Model="_request">
             <MudGrid>
-                @* ============================================ *@
-                @* SECCIÓN 1: DATOS PERSONALES *@
-                @* ============================================ *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 1: IDENTIFICACIÓN (READONLY) *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12">
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">📋 Datos Personales</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">🪪 Identificación</MudText>
                     <MudDivider Class="mb-3" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudTextField Value="@_employee.Identification" Label="🆔 Cédula"
-                                  Variant="Variant.Outlined" ReadOnly="true" />
+                    <MudTextField Value="@_request.Identification"
+                                  ValueChanged="@((string v) => OnIdentificationChanged(v))"
+                                  Label="🆔 Cédula"
+                                  Variant="Variant.Outlined"
+                                  ReadOnly="@(!_isAdmin)"
+                                  Required="true"
+                                  Validation="@(new Func<string, string?>(ValidateCedula))"
+                                  HelperText="@(_isAdmin
+                                                        ? "⚠️ Modo Admin: Puede modificar la cédula. Se validará formato y unicidad."
+                                                        : "Solo lectura - Contacte a un administrador para cambios")"
+                                  Color="@(_isAdmin ? Color.Warning : Color.Default)" />
                 </MudItem>
+
+                @if (_isAdmin && _cedulaModificada)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" Icon="@Icons.Material.Filled.Warning">
+                            <MudText Typo="Typo.body2">
+                                <strong>⚠️ ATENCIÓN:</strong> La cédula fue modificada de
+                                <strong>@_cedulaOriginal</strong> a <strong>@_request.Identification</strong>.
+                                Esta acción es irreversible y quedará registrada en auditoría.
+                            </MudText>
+                        </MudAlert>
+                    </MudItem>
+                }
+
                 <MudItem xs="12" sm="6">
                     <MudTextField Value="@_employee.Code" Label="🏢 Código Empleado"
                                   Variant="Variant.Outlined" ReadOnly="true" />
                 </MudItem>
 
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 2: DATOS PERSONALES *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">👤 Datos Personales</MudText>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="_request.FirstName" Label="👤 Nombres *"
+                    <MudTextField @bind-Value="_request.FirstName" Label="Primer Nombre *"
                                   Variant="Variant.Outlined" Required="true" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="_request.LastName" Label="👤 Apellidos *"
+                    <MudTextField @bind-Value="_request.SecondName" Label="Segundo Nombre"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_request.LastName" Label="Primer Apellido *"
                                   Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_request.SecondLastName" Label="Segundo Apellido"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker @bind-Date="_request.BirthDate" Label="🎂 Fecha de Nacimiento"
+                                   Variant="Variant.Outlined" MaxDate="DateTime.Today.AddYears(-15)" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" @bind-Value="_request.Gender" Label="⚧ Sexo"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("M")">Masculino</MudSelectItem>
+                        <MudSelectItem Value="@("F")">Femenino</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" @bind-Value="_request.MaritalStatus" Label="💍 Estado Civil"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("S")">Soltero/a</MudSelectItem>
+                        <MudSelectItem Value="@("C")">Casado/a</MudSelectItem>
+                        <MudSelectItem Value="@("U")">Unión libre</MudSelectItem>
+                        <MudSelectItem Value="@("D")">Divorciado/a</MudSelectItem>
+                        <MudSelectItem Value="@("V")">Viudo/a</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 3: CONTACTO Y DOMICILIO *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">📞 Contacto y Domicilio</MudText>
+                    <MudDivider Class="mb-3" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
@@ -54,15 +134,70 @@ else if (_employee != null)
                                   Validation="@(new Func<string, string?>(ValidateEmail))" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="_request.Phone" Label="📱 Teléfono *"
+                    <MudTextField @bind-Value="_request.Phone" Label="☎️ Teléfono"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_request.MobilePhone" Label="📱 Celular *"
                                   Variant="Variant.Outlined" Required="true" />
                 </MudItem>
 
-                @* ============================================ *@
-                @* SECCIÓN 2: DATOS FISCALES *@
-                @* ============================================ *@
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_request.Address" Label="📍 Dirección"
+                                  Variant="Variant.Outlined" Lines="2" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Value="_request.DepartmentId"
+                               ValueChanged="@((int? v) => OnDepartmentChanged(v))"
+                               Label="🗺️ Departamento"
+                               Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="int?" Value="null">-- Seleccione --</MudSelectItem>
+                        @foreach (var d in _departments)
+                        {
+                            <MudSelectItem T="int?" Value="@d.Id">@d.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Value="_request.MunicipalityId"
+                               ValueChanged="@((int? v) => { _request.MunicipalityId = v; StateHasChanged(); })"
+                               Label="🏘️ Municipio"
+                               Variant="Variant.Outlined" Clearable="true"
+                               Disabled="@(!_request.DepartmentId.HasValue)">
+                        <MudSelectItem T="int?" Value="null">-- Seleccione --</MudSelectItem>
+                        @foreach (var m in _municipalities)
+                        {
+                            <MudSelectItem T="int?" Value="@m.Id">@m.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 4: CONTACTO DE EMERGENCIA *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12" Class="mt-4">
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">📋 Datos Fiscales</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">🚨 Contacto de Emergencia</MudText>
+                    <MudDivider Class="mb-3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.EmergencyContactName" Label="👤 Nombre *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.EmergencyContactPhone" Label="📞 Teléfono *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.EmergencyContactRelationship" Label="👨‍👩‍👧 Parentesco *"
+                                  Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 5: DATOS FISCALES *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">🏛️ Datos Fiscales</MudText>
                     <MudDivider Class="mb-3" />
                 </MudItem>
 
@@ -75,11 +210,11 @@ else if (_employee != null)
                                   Required="true" Variant="Variant.Outlined" />
                 </MudItem>
 
-                @* ============================================ *@
-                @* SECCIÓN 3: ASIGNACIÓN LABORAL *@
-                @* ============================================ *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 6: ASIGNACIÓN LABORAL *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12" Class="mt-4">
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">🏢 Asignación Laboral</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">💼 Asignación Laboral</MudText>
                     <MudDivider Class="mb-3" />
                 </MudItem>
 
@@ -93,14 +228,12 @@ else if (_employee != null)
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="Guid?" @bind-Value="_request.CostCenterId"
-                               Label="🏢 Centro de Costo"
-                               Variant="Variant.Outlined"
-                               Clearable="true">
-                        <MudSelectItem T="Guid?" Value="null">Sin asignar</MudSelectItem>
-                        @foreach (var cc in _costCenters)
+                    <MudSelect T="Guid" @bind-Value="_request.PayrollGroupId"
+                               Label="💼 Grupo de Nómina *"
+                               Variant="Variant.Outlined" Required="true">
+                        @foreach (var pg in _payrollGroups)
                         {
-                            <MudSelectItem T="Guid?" Value="@cc.Id">@cc.Code - @cc.Name</MudSelectItem>
+                            <MudSelectItem T="Guid" Value="@pg.Id">@pg.Name</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
@@ -113,33 +246,13 @@ else if (_employee != null)
                         }
                     </MudSelect>
                 </MudItem>
-
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="Guid"
-                               Value="_request.JobGradeId"
-                               ValueChanged="@(async (Guid v) => await OnJobGradeChanged(v))"
-                               Label="👔 Puesto / Nivel *"
-                               Variant="Variant.Outlined"
-                               Required="true">
-                        @foreach (var grade in _jobGrades)
-                        {
-                            <MudSelectItem T="Guid" Value="@grade.Id">
-                                @grade.JobPositionName - @grade.Name
-                            </MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-
                 <MudItem xs="12" sm="6">
                     <MudNumericField T="decimal"
                                      Value="_request.BaseSalary"
                                      ValueChanged="@((decimal v) => OnSalaryChanged(v))"
                                      Label="💰 Salario Base (C$) *"
-                                     Variant="Variant.Outlined"
-                                     Required="true"
-                                     Min="0m"
-                                     Step="100m"
-                                     Format="N2" />
+                                     Variant="Variant.Outlined" Required="true"
+                                     Min="0m" Step="100m" Format="N2" />
                 </MudItem>
 
                 @if (_showMinSalaryWarning)
@@ -151,41 +264,46 @@ else if (_employee != null)
                     </MudItem>
                 }
 
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="Guid?" @bind-Value="_request.HealthProviderId"
-                               Label="🏥 Proveedor Salud" Variant="Variant.Outlined">
-                        <MudSelectItem T="Guid?" Value="null">Sin proveedor</MudSelectItem>
-                        @foreach (var hp in _healthProviders)
-                        {
-                            <MudSelectItem T="Guid?" Value="@hp.Id">@hp.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-
-                @* ============================================ *@
-                @* SECCIÓN 4: PERÍODO DE PRUEBA (Solo Lectura) *@
-                @* ============================================ *@
-                <MudItem xs="12" Class="mt-4">
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">📅 Período de Prueba</MudText>
-                    <MudDivider Class="mb-3" />
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* CAMPOS READONLY gestionados por Acciones de Personal *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2 mb-2">
+                        <MudText Typo="Typo.body2">
+                            <strong>⚠️ Nota:</strong> Los campos <strong>Puesto, Proveedor de Salud, Centro de Costo y Datos Bancarios</strong>
+                            se gestionan mediante <strong>Acciones de Personal</strong> y no pueden editarse aquí.
+                        </MudText>
+                    </MudAlert>
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudDatePicker @bind-Date="_request.ProbationStartDate"
-                                   Label="Inicio Período de Prueba"
-                                   ReadOnly="true"
-                                   Variant="Variant.Outlined" />
+                    <MudTextField Value="@(_selectedJobGrade != null ? $"{_selectedJobGrade.JobPositionName} - {_selectedJobGrade.Name}" : "Sin puesto")"
+                                  Label="👔 Puesto / Nivel"
+                                  Variant="Variant.Outlined" ReadOnly="true"
+                                  HelperText="Gestionado por Acción de Personal: PositionChange" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudDatePicker @bind-Date="_request.ProbationEndDate"
-                                   Label="Fin Período de Prueba"
-                                   ReadOnly="true"
-                                   Variant="Variant.Outlined" />
+                    <MudTextField Value="@(_selectedHealthProvider?.Name ?? "Sin proveedor")"
+                                  Label="🏥 Proveedor Salud"
+                                  Variant="Variant.Outlined" ReadOnly="true"
+                                  HelperText="Gestionado por Acción de Personal: HealthProviderChange" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Value="@(_selectedCostCenter != null ? $"{_selectedCostCenter.Code} - {_selectedCostCenter.Name}" : "Sin asignar")"
+                                  Label="🏢 Centro de Costo"
+                                  Variant="Variant.Outlined" ReadOnly="true"
+                                  HelperText="Gestionado por Acción de Personal: CostCenterChange" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Value="@(_selectedBank?.Name ?? "Sin cuenta")"
+                                  Label="🏦 Banco"
+                                  Variant="Variant.Outlined" ReadOnly="true"
+                                  HelperText="Gestionado por Acción de Personal: BankAccountChange" />
                 </MudItem>
 
-                @* ============================================ *@
-                @* SECCIÓN 5: CONDICIONES ESPECIALES *@
-                @* ============================================ *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 7: CONDICIONES ESPECIALES *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12" Class="mt-4">
                     <MudText Typo="Typo.subtitle1" Class="mb-2">⚙️ Condiciones Especiales</MudText>
                     <MudDivider Class="mb-3" />
@@ -197,20 +315,24 @@ else if (_employee != null)
                                  Color="Color.Primary" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudNumericField T="decimal?" @bind-Value="_request.BenefitsInKindValue"
-                                     Label="💼 Valor Beneficios en Especie (C$)"
-                                     Variant="Variant.Outlined"
-                                     Format="N2" />
+                    <MudCheckBox @bind-Value="_request.UsesTimeClock"
+                                 Label="Usa Reloj de Marcas"
+                                 Color="Color.Info" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal?" @bind-Value="_request.BenefitsInKindValue"
+                                     Label="💼 Valor Beneficios en Especie (C$)"
+                                     Variant="Variant.Outlined" Format="N2" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
                     <MudTextField @bind-Value="_request.BenefitsInKindDescription"
                                   Label="📝 Descripción Beneficios"
                                   Variant="Variant.Outlined" />
                 </MudItem>
 
-                @* ============================================ *@
-                @* SECCIÓN 6: TRABAJADOR EXTRANJERO *@
-                @* ============================================ *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 8: TRABAJADOR EXTRANJERO *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12" Class="mt-4">
                     <MudText Typo="Typo.subtitle1" Class="mb-2">🌍 Trabajador Extranjero (Opcional)</MudText>
                     <MudDivider Class="mb-3" />
@@ -232,40 +354,9 @@ else if (_employee != null)
                                    Variant="Variant.Outlined" />
                 </MudItem>
 
-                @* ============================================ *@
-                @* SECCIÓN 7: DATOS BANCARIOS *@
-                @* ============================================ *@
-                <MudItem xs="12" Class="mt-4">
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">🏦 Datos Bancarios</MudText>
-                    <MudDivider Class="mb-3" />
-                </MudItem>
-
-                <MudItem xs="12" sm="4">
-                    <MudSelect T="int?" @bind-Value="_request.BankId" Label="Banco"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="int?" Value="null">Sin cuenta</MudSelectItem>
-                        @foreach (var bank in _banks)
-                        {
-                            <MudSelectItem T="int?" Value="@bank.Id">@bank.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudSelect T="string" @bind-Value="_request.BankAccountType"
-                               Label="Tipo Cuenta" Variant="Variant.Outlined">
-                        <MudSelectItem T="string" Value="@("")">N/A</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Ahorro")">Ahorro</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Corriente")">Corriente</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudTextField @bind-Value="_request.BankAccountNumber"
-                                  Label="Número Cuenta" Variant="Variant.Outlined" />
-                </MudItem>
-
-                @* ============================================ *@
-                @* SECCIÓN 8: ESTADO Y NOTAS *@
-                @* ============================================ *@
+                @* ═══════════════════════════════════════════════════════════════ *@
+                @* SECCIÓN 9: ESTADO Y NOTAS *@
+                @* ═══════════════════════════════════════════════════════════════ *@
                 <MudItem xs="12" Class="mt-4">
                     <MudText Typo="Typo.subtitle1" Class="mb-2">⚙️ Estado</MudText>
                     <MudDivider Class="mb-3" />
@@ -284,14 +375,13 @@ else if (_employee != null)
                 <MudItem xs="12">
                     <MudTextField @bind-Value="_request.Notes"
                                   Label="Notas / Observaciones"
-                                  Variant="Variant.Outlined"
-                                  Lines="3" />
+                                  Variant="Variant.Outlined" Lines="3" />
                 </MudItem>
 
                 <MudItem xs="12">
                     <MudAlert Severity="Severity.Info" Class="mt-4">
                         <MudText Typo="Typo.body2">
-                            <strong>ℹ️ Nota:</strong> Los cambios de Estado (Suspensión, Terminación) y Período de Prueba se gestionan mediante el módulo de <strong>"Acciones de Personal"</strong>.
+                            <strong>ℹ️ Nota:</strong> Los cambios de Estado (Suspensión, Terminación), Período de Prueba, Puesto, Proveedor de Salud, Centro de Costo y Datos Bancarios se gestionan mediante el módulo de <strong>"Acciones de Personal"</strong>.
                         </MudText>
                     </MudAlert>
                 </MudItem>
@@ -337,16 +427,44 @@ else
     private EmployeeDetailDto? _employee;
     private UpdateEmployeeRequest _request = new();
 
+    // ✅ Catálogos
     private List<BranchDto> _branches = new();
     private List<ContractTypeDto> _contractTypes = new();
     private List<JobGradeDto> _jobGrades = new();
     private List<HealthProviderDto> _healthProviders = new();
     private List<BankDto> _banks = new();
-
     private List<CostCenterDto> _costCenters = new();
+    private List<PayrollGroupDto> _payrollGroups = new();
+    private List<DepartmentDto> _departments = new();
+    private List<MunicipalityDto> _municipalities = new();
+
+    // ✅ Variables para mostrar valores en campos readonly
+    private JobGradeDto? _selectedJobGrade;
+    private HealthProviderDto? _selectedHealthProvider;
+    private BankDto? _selectedBank;
+    private CostCenterDto? _selectedCostCenter;
+
+    // ✅  Control de permisos y cédula
+    private bool _isAdmin = false; // si es true Fuerza el modo administrador para pruebas
+    private bool _cedulaModificada = false;
+    private string _cedulaOriginal = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        // ═══════════════════════════════════════════════════════════════
+        // VERIFICAR ROL DEL USUARIO
+        // ═══════════════════════════════════════════════════════════════
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            _isAdmin = user.IsInRole("Admin") || user.IsInRole("Administrator");
+        }
+        catch
+        {
+            _isAdmin = false;
+        }
+
         await LoadData();
     }
 
@@ -355,15 +473,21 @@ else
         _isLoading = true;
         try
         {
-            // Cargar catálogos
+            // ═══════════════════════════════════════════════════════════════
+            // PASO 1: Cargar catálogos básicos
+            // ═══════════════════════════════════════════════════════════════
             _branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/branches/active") ?? new();
             _contractTypes = await Http.GetFromJsonAsync<List<ContractTypeDto>>("api/contracttypes/all") ?? new();
             _jobGrades = await Http.GetFromJsonAsync<List<JobGradeDto>>("api/jobgrades/active") ?? new();
             _healthProviders = await Http.GetFromJsonAsync<List<HealthProviderDto>>("api/healthproviders/active") ?? new();
             _banks = await Http.GetFromJsonAsync<List<BankDto>>("api/banks/active") ?? new();
             _costCenters = await Http.GetFromJsonAsync<List<CostCenterDto>>("api/costcenters/active") ?? new();
+            _payrollGroups = await Http.GetFromJsonAsync<List<PayrollGroupDto>>("api/payrollgroups/active") ?? new();
+            _departments = await Http.GetFromJsonAsync<List<DepartmentDto>>("api/departments/active") ?? new();
 
-            // Cargar empleado
+            // ═══════════════════════════════════════════════════════════════
+            // PASO 2: Cargar el empleado
+            // ═══════════════════════════════════════════════════════════════
             var response = await Http.GetAsync($"api/employees/{Id}");
             if (response.IsSuccessStatusCode)
             {
@@ -371,44 +495,99 @@ else
 
                 if (_employee != null)
                 {
-                    // ✅ Mapeo COMPLETO de todos los campos (incluyendo los nuevos)
+                    // ═══════════════════════════════════════════════════════════════
+                    // PASO 3: Si el empleado tiene departamento, cargar sus municipios
+                    // ═══════════════════════════════════════════════════════════════
+                    if (_employee.DepartmentId.HasValue)
+                    {
+                        try
+                        {
+                            _municipalities = await Http.GetFromJsonAsync<List<MunicipalityDto>>(
+                                $"api/municipalities/by-department/{_employee.DepartmentId}") ?? new();
+                        }
+                        catch (Exception ex)
+                        {
+                            Snackbar.Add($"⚠️ Error cargando municipios: {ex.Message}", Severity.Warning);
+                            _municipalities = new();
+                        }
+                    }
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // PASO 4: Mapear datos del empleado al request
+                    // ═══════════════════════════════════════════════════════════════
                     _request = new UpdateEmployeeRequest
                     {
                         Id = _employee.Id,
+
+                        // Datos personales
                         FirstName = _employee.FirstName,
+                        SecondName = _employee.SecondName,
                         LastName = _employee.LastName,
+                        SecondLastName = _employee.SecondLastName,
+                        BirthDate = _employee.BirthDate,
+                        Gender = _employee.Gender,
+                        MaritalStatus = _employee.MaritalStatus,
+
+                        // Contacto
                         Email = _employee.Email,
                         Phone = _employee.Phone,
-                        BranchId = _employee.BranchId,
-                        ContractTypeId = (int)_employee.ContractTypeId,
-                        JobGradeId = _employee.JobGradeId ?? Guid.Empty,
-                        BaseSalary = _employee.BaseSalary,
-                        HealthProviderId = _employee.HealthProviderId,
-                        BankId = _employee.BankId,
-                        BankAccountNumber = _employee.BankAccountNumber,
-                        BankAccountType = _employee.BankAccountType,
-                        IsActive = _employee.IsActive,
+                        MobilePhone = _employee.MobilePhone,
 
-                        // ✅ NUEVOS CAMPOS
+                        // Domicilio
+                        Address = _employee.Address,
+                        DepartmentId = _employee.DepartmentId,
+                        MunicipalityId = _employee.MunicipalityId,
+
+                        // Contacto emergencia
+                        EmergencyContactName = _employee.EmergencyContactName,
+                        EmergencyContactPhone = _employee.EmergencyContactPhone,
+                        EmergencyContactRelationship = _employee.EmergencyContactRelationship,
+
+                        // Datos fiscales
                         NORUC = _employee.NORUC ?? string.Empty,
                         NOINSS = _employee.NOINSS ?? string.Empty,
+
+                        // Asignación laboral
+                        BranchId = _employee.BranchId,
+                        PayrollGroupId = _employee.PayrollGroupId,
+                        ContractTypeId = _employee.ContractTypeId ?? 0,
+                        BaseSalary = _employee.BaseSalary,
+
+                        // Condiciones especiales
                         IsTrustEmployee = _employee.IsTrustEmployee,
+                        UsesTimeClock = _employee.UsesTimeClock,
+                        BenefitsInKindValue = _employee.BenefitsInKindValue,
+                        BenefitsInKindDescription = _employee.BenefitsInKindDescription,
+
+                        // Trabajador extranjero
                         Nationality = _employee.Nationality,
                         WorkPermitNumber = _employee.WorkPermitNumber,
                         WorkPermitExpirationDate = _employee.WorkPermitExpirationDate,
-                        BenefitsInKindValue = _employee.BenefitsInKindValue,
-                        BenefitsInKindDescription = _employee.BenefitsInKindDescription,
+
+                        // Bancario
+                        BankBeneficiaryName = _employee.BankBeneficiaryName,
+
+                        // Estado y notas
+                        IsActive = _employee.IsActive,
                         Notes = _employee.Notes,
+
+                        // Período de prueba
                         ProbationStartDate = _employee.ProbationStartDate,
-                        ProbationEndDate = _employee.ProbationEndDate,
-                        CostCenterId = _employee.CostCenterId
+                        ProbationEndDate = _employee.ProbationEndDate
                     };
 
+                    // ═══════════════════════════════════════════════════════════════
+                    // PASO 5: Cargar valores para campos readonly
+                    // ═══════════════════════════════════════════════════════════════
+                    _selectedJobGrade = _jobGrades.FirstOrDefault(jg => jg.Id == _employee.JobGradeId);
+                    _selectedHealthProvider = _healthProviders.FirstOrDefault(hp => hp.Id == _employee.HealthProviderId);
+                    _selectedBank = _banks.FirstOrDefault(b => b.Id == _employee.BankId);
+                    _selectedCostCenter = _costCenters.FirstOrDefault(cc => cc.Id == _employee.CostCenterId);
+
                     // Validar salario mínimo inicial
-                    var selectedGrade = _jobGrades.FirstOrDefault(jg => jg.Id == _employee.JobGradeId);
-                    if (selectedGrade != null)
+                    if (_selectedJobGrade != null)
                     {
-                        _minSalaryRequired = selectedGrade.MinWageNIO;
+                        _minSalaryRequired = _selectedJobGrade.MinWageNIO;
                         OnSalaryChanged(_employee.BaseSalary);
                     }
                 }
@@ -430,16 +609,48 @@ else
         }
     }
 
-    private async Task OnJobGradeChanged(Guid jobGradeId)
+    private async Task OnDepartmentChanged(int? departmentId)
     {
-        _request.JobGradeId = jobGradeId;
-        var selectedGrade = _jobGrades.FirstOrDefault(jg => jg.Id == jobGradeId);
-        if (selectedGrade != null)
+        _request.DepartmentId = departmentId;
+        _request.MunicipalityId = null;
+        _municipalities.Clear();
+
+        if (departmentId.HasValue)
         {
-            _minSalaryRequired = selectedGrade.MinWageNIO;
-            OnSalaryChanged(_request.BaseSalary);
+            try
+            {
+                _municipalities = await Http.GetFromJsonAsync<List<MunicipalityDto>>(
+                    $"api/municipalities/by-department/{departmentId}") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"⚠️ Error cargando municipios: {ex.Message}", Severity.Warning);
+                _municipalities = new();
+            }
         }
-        await Task.CompletedTask;
+
+        StateHasChanged();
+    }
+
+    private void OnIdentificationChanged(string newCedula)
+    {
+        if (string.IsNullOrWhiteSpace(newCedula))
+        {
+            _request.Identification = newCedula;
+            _cedulaModificada = false;
+            StateHasChanged();
+            return;
+        }
+
+        _request.Identification = newCedula;
+
+        // Detectar si cambió respecto al original
+        _cedulaModificada = !string.Equals(
+            newCedula.Trim(),
+            _cedulaOriginal.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+
+        StateHasChanged();
     }
 
     private void OnSalaryChanged(decimal salary)
@@ -457,6 +668,18 @@ else
         return null;
     }
 
+    private string ValidateCedula(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "La cédula es obligatoria.";
+
+        // Validación matemática estricta
+        if (!Gestiona360.Payroll.Application.Contracts.Common.Validators.CedulaValidator.EsValida(value))
+            return "La cédula no es válida. Verifique el formato y el dígito verificador (letra final).";
+
+        return null; // Es válida
+    }
+
     private async Task SubmitAsync()
     {
         if (_form != null)
@@ -468,6 +691,25 @@ else
                 return;
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CONFIRMACIÓN SI SE MODIFICÓ LA CÉDULA
+        // ═══════════════════════════════════════════════════════════════
+        if (_cedulaModificada)
+        {
+            bool? confirmado = await DialogService.ShowMessageBox(
+                "⚠️ Confirmar cambio de cédula",
+                $"Está a punto de modificar la cédula del empleado.\n\n" +
+                $"Cédula anterior: {_cedulaOriginal}\n" +
+                $"Cédula nueva: {_request.Identification}\n\n" +
+                $"Esta acción quedará registrada en auditoría. ¿Desea continuar?",
+                yesText: "Sí, continuar",
+                noText: "Cancelar");
+
+            if (confirmado != true)
+                return;
+        }
+
 
         _isSubmitting = true;
         StateHasChanged();
@@ -499,4 +741,19 @@ else
     }
 
     private void Cancel() => Navigation.NavigateTo($"/employees/{Id}");
+
+    // ✅ DTOs auxiliares
+    public class DepartmentDto { public int Id { get; set; } public string Name { get; set; } = ""; }
+    public class MunicipalityDto { public int Id { get; set; } public string Name { get; set; } = ""; public int DepartmentId { get; set; } }
+    public class JobGradeDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string JobPositionName { get; set; } = "";
+        public decimal MinWageNIO { get; set; }
+    }
+    public class HealthProviderDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
+    public class BankDto { public int Id { get; set; } public string Name { get; set; } = ""; }
+    public class CostCenterDto { public Guid Id { get; set; } public string Code { get; set; } = ""; public string Name { get; set; } = ""; }
+    public class PayrollGroupDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
 }

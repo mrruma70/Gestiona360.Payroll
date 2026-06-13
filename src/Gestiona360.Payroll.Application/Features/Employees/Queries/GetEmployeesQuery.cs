@@ -13,12 +13,12 @@ namespace Gestiona360.Payroll.Application.Features.Employees.Queries
         Guid? BranchId = null,
         int? ContractTypeId = null,
         string? Status = null,
-        Guid? JobPositionId = null,
-        // NUEVOS PARÁMETROS DE FILTRO
+        Guid? JobPositionId = null,  
         int? EmploymentStatus = null,
         bool? IsTrustEmployee = null,
         bool? IsForeignWorker = null,
         bool? IsOnProbation = null,
-        bool? IsRehire = null
+        bool? IsRehire = null,
+        Guid? PayrollGroupId = null
     ) : IRequest<EmployeeSearchResultDto>;
 }

@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="Gestiona360.Payroll.Application.Abstractions/Gestiona360.Payroll.Application.Abstractions.csproj" Id="4b6952a3-b12e-4995-872f-6cc0fdc28eab" />
+    <Project Path="src/Gestiona360.Payroll.Application.Abstractions/Gestiona360.Payroll.Application.Abstractions.csproj" Id="4b6952a3-b12e-4995-872f-6cc0fdc28eab" />
     <Project Path="src/Gestiona360.Payroll.API.Contracts/Gestiona360.Payroll.API.Contracts.csproj" />
     <Project Path="src/Gestiona360.Payroll.API/Gestiona360.Payroll.API.csproj" />
     <Project Path="src/Gestiona360.Payroll.Application.Contracts/Gestiona360.Payroll.Application.Contracts.csproj" />

@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
-using Gestiona360.Payroll.Application.Commands.PayrollFrequency;
 using Gestiona360.Payroll.Application.Contracts.Requests;
+using Gestiona360.Payroll.Application.Features.PayrollFrequency;
 
 namespace Gestiona360.Payroll.Application.Validators
 {

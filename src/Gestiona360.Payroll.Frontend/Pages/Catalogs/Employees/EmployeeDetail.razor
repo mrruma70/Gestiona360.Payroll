@@ -1,6 +1,5 @@
 ﻿@page "/employees/{id:guid}"
 @using Gestiona360.Payroll.Application.Contracts.DTOs.Employees
-@using Gestiona360.Payroll.Domain.Shared.Frontend
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
@@ -18,99 +17,191 @@
 }
 else if (_employee != null)
 {
-    <MudText Typo="Typo.h5" Class="mb-2">
-        👤 Ficha del Empleado: <strong>@_employee.FirstName @_employee.LastName</strong>
-    </MudText>
-
-    <MudChip T="string" Color="@(_employee.IsActive ? Color.Success : Color.Warning)" Class="mb-4">
-        @(_employee.IsActive ? "✅ Activo" : "⏸️ Inactivo")
-    </MudChip>
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* ENCABEZADO MEJORADO *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudText Typo="Typo.h5" Class="mb-2">
+                    👤 <strong>@_employee.FirstName @(_employee.SecondName) @_employee.LastName @(_employee.SecondLastName)</strong>
+                </MudText>
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                    @_employee.JobPositionName - @_employee.JobGradeName
+                </MudText>
+                <MudStack Row="true" Spacing="2" Class="mt-2">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_employee.EmploymentStatus)">
+                        @GetStatusText(_employee.EmploymentStatus)
+                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                        🆔 @_employee.Identification
+                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                        🏢 @_employee.Code
+                    </MudChip>
+                    @if (_employee.IsOnProbation)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                            ⏳ En Período de Prueba
+                        </MudChip>
+                    }
+                    @if (_employee.UsesTimeClock)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Variant="Variant.Outlined">
+                            ⏰ Usa Reloj de Marcas
+                        </MudChip>
+                    }
+                    @if (_employee.PreviousEmployeeId.HasValue)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                            🔄 Reingreso
+                        </MudChip>
+                    }
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">
+                        Volver
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditEmployee">
+                        ✏️ Editar
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintFicha">
+                        🖨️ PDF
+                    </MudButton>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
 
     <MudTabs Elevation="1" Rounded="true" Border="true" ApplyEffectsToContainer="true">
 
-        <!-- PESTAÑA 1: RESUMEN Y DATOS PERSONALES -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 1: RESUMEN Y DATOS PERSONALES *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Resumen" Icon="@Icons.Material.Filled.Person">
             <MudGrid Class="mt-2">
                 <MudItem xs="12" md="4">
                     <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="0">
-                    
-                        @* ✅ LÓGICA CONDICIONAL: Foto o Iniciales *@
                         @if (!string.IsNullOrEmpty(_employee.PhotoUrl))
                         {
-                        
                             <img src="@GetFullImageUrl(_employee.PhotoUrl)"
                                  alt="Foto de perfil"
-                                 style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--mud-palette-primary);"
+                                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--mud-palette-primary);"
                                  class="mb-3" />
                         }
                         else
                         {
-                            <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-3" Style="width: 100px; height: 100px; font-size: 2.5rem;">
+                            <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-3" Style="width: 120px; height: 120px; font-size: 3rem;">
                                 @GetInitials(_employee.FirstName, _employee.LastName)
                             </MudAvatar>
                         }
 
-                        <MudText Typo="Typo.h6">@_employee.FirstName @_employee.LastName</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            @if (!string.IsNullOrEmpty(_employee.JobGradeName))
-                            {
-                                @($"{_employee.JobPositionName} - {_employee.JobGradeName}")
-                            }
-                            else
-                            {
-                                @_employee.JobPositionName
-                            }
+                        <MudText Typo="Typo.h6" Align="Align.Center">
+                            @_employee.FirstName @_employee.LastName
                         </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                            @_employee.JobPositionName
+                        </MudText>
+
                         <MudDivider Class="my-3" />
 
-                        @* ✅ NUEVO: InputFile oculto + Label que actúa como botón *@
                         <InputFile id="photoUpload" style="display: none;"
                                    OnChange="@(e => HandleFileUpload(e, "photo"))"
                                    accept="image/*" />
-                        <label for="photoUpload" class="mud-button-root mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small mud-ripple"
-                               style="cursor: pointer; padding: 6px 16px; border: 1px solid var(--mud-palette-primary); border-radius: 4px; color: var(--mud-palette-primary);">
-                            <span class="mud-button-icon-start-root">
-                                <svg class="mud-icon-root mud-svg-icon mud-icon-size-small" focusable="false" viewBox="0 0 24 24">
-                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                </svg>
-                            </span>
-                            <span class="mud-button-label">Cambiar Foto</span>
+                        <label for="photoUpload" class="mud-button-root mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small mud-ripple mb-3"
+                               style="cursor: pointer; padding: 6px 16px;">
+                            📷 Cambiar Foto
                         </label>
 
-                        <MudDivider Class="my-3" />
-                        <MudText Typo="Typo.body2"><strong>🆔 Cédula:</strong> @_employee.Identification</MudText>
-                        <MudText Typo="Typo.body2"><strong>🏢 Código:</strong> @_employee.Code</MudText>
+                        <MudDivider Class="my-2" />
+
+                        <MudText Typo="Typo.body2" Class="mt-2"><strong>🎂 Nacimiento:</strong> @(_employee.BirthDate?.ToString("dd/MM/yyyy") ?? "N/A")</MudText>
+                        <MudText Typo="Typo.body2"><strong>⚧ Sexo:</strong> @GetGenderText(_employee.Gender)</MudText>
+                        <MudText Typo="Typo.body2"><strong>💍 Estado Civil:</strong> @GetMaritalStatusText(_employee.MaritalStatus)</MudText>
                         <MudText Typo="Typo.body2"><strong>📅 Ingreso:</strong> @_employee.HireDate.ToString("dd/MM/yyyy")</MudText>
+                        @if (_employee.FirstHireDate.HasValue && _employee.FirstHireDate != _employee.HireDate)
+                        {
+                            <MudText Typo="Typo.body2"><strong>📅 Primer Ingreso:</strong> @_employee.FirstHireDate.Value.ToString("dd/MM/yyyy")</MudText>
+                        }
+                        <MudText Typo="Typo.body2"><strong>⏳ Antigüedad:</strong> @GetAntiguedad(_employee.FirstHireDate ?? _employee.HireDate)</MudText>
                     </MudPaper>
                 </MudItem>
 
                 <MudItem xs="12" md="8">
-                    <MudPaper Class="pa-4" Elevation="0">
+                    @* ── Contacto ── *@
+                    <MudPaper Class="pa-4 mb-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">📞 Información de Contacto</MudText>
                         <MudGrid>
                             <MudItem xs="12" sm="6">
                                 <MudTextField Value="@_employee.Email" Label="📧 Correo Electrónico" ReadOnly="true" Variant="Variant.Outlined" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.Phone" Label="📱 Teléfono" ReadOnly="true" Variant="Variant.Outlined" />
+                                <MudTextField Value="@_employee.Phone" Label="☎️ Teléfono" ReadOnly="true" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField Value="@(_employee.MobilePhone ?? "N/A")" Label="📱 Celular" ReadOnly="true" Variant="Variant.Outlined" />
                             </MudItem>
                         </MudGrid>
+                    </MudPaper>
 
-                        <MudText Typo="Typo.subtitle1" Class="mb-3 mt-6">🏢 Asignación Laboral</MudText>
+                    @* ── Domicilio ── *@
+                    <MudPaper Class="pa-4 mb-4" Elevation="0">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">🏠 Domicilio</MudText>
+                        <MudGrid>
+                            <MudItem xs="12">
+                                <MudTextField Value="@(_employee.Address ?? "No registrada")" Label="📍 Dirección" ReadOnly="true" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField Value="@(_employee.DepartmentName ?? "N/A")" Label="🗺️ Departamento" ReadOnly="true" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField Value="@(_employee.MunicipalityName ?? "N/A")" Label="🏘️ Municipio" ReadOnly="true" Variant="Variant.Outlined" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    @* ── Contacto de Emergencia ── *@
+                    <MudPaper Class="pa-4 mb-4" Elevation="0">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">🚨 Contacto de Emergencia</MudText>
+                        @if (!string.IsNullOrEmpty(_employee.EmergencyContactName))
+                        {
+                            <MudGrid>
+                                <MudItem xs="12" sm="4">
+                                    <MudTextField Value="@_employee.EmergencyContactName" Label="👤 Nombre" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudTextField Value="@(_employee.EmergencyContactPhone ?? "N/A")" Label="📞 Teléfono" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudTextField Value="@(_employee.EmergencyContactRelationship ?? "N/A")" Label="👨‍👩‍👧 Parentesco" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true">
+                                <MudText Typo="Typo.body2">⚠️ No hay contacto de emergencia registrado. Actualice el empleado para agregarlo.</MudText>
+                            </MudAlert>
+                        }
+                    </MudPaper>
+
+                    @* ── Asignación Laboral ── *@
+                    <MudPaper Class="pa-4" Elevation="0">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">💼 Asignación Laboral</MudText>
                         <MudGrid>
                             <MudItem xs="12" sm="6">
                                 <MudTextField Value="@_employee.BranchName" Label="🏙️ Sucursal" ReadOnly="true" Variant="Variant.Outlined" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.CostCenterName"
-                                              Label="🏢 Centro de Costo"
-                                              ReadOnly="true"
-                                              Variant="Variant.Outlined"
-                                              Adornment="Adornment.Start"
-                                              AdornmentText="@_employee.CostCenterCode" />
+                                <MudTextField Value="@(_employee.PayrollGroupName ?? "No asignado")"
+                                              Label="💼 Grupo de Nómina" ReadOnly="true" Variant="Variant.Outlined" Color="Color.Primary" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.JobGradeName" Label="📊 Nivel / Grado" ReadOnly="true" Variant="Variant.Outlined" />
+                                <MudTextField Value="@_employee.CostCenterName"
+                                              Label="🏢 Centro de Costo" ReadOnly="true" Variant="Variant.Outlined"
+                                              Adornment="Adornment.Start" AdornmentText="@_employee.CostCenterCode" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudTextField Value="@_employee.ContractTypeName" Label="📄 Tipo de Contrato" ReadOnly="true" Variant="Variant.Outlined" />
@@ -124,14 +215,18 @@ else if (_employee != null)
             </MudGrid>
         </MudTabPanel>
 
-        <!-- PESTAÑA 2: DATOS BANCARIOS Y SALARIALES -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 2: DATOS BANCARIOS Y SALARIALES *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Salario y Banco" Icon="@Icons.Material.Filled.AccountBalance">
             <MudGrid Class="mt-2">
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">💰 Datos Salariales</MudText>
-                        <MudTextField Value="@($"C$ {_employee.BaseSalary:N2}")" Label="Salario Base Mensual" ReadOnly="true" Variant="Variant.Outlined" Color="Color.Success" />
-                        <MudTextField Value="@_employee.HealthProviderName" Label="🏥 Proveedor de Salud" ReadOnly="true" Variant="Variant.Outlined" Class="mt-3" />
+                        <MudTextField Value="@($"C$ {_employee.BaseSalary:N2}")" Label="Salario Base Mensual"
+                                      ReadOnly="true" Variant="Variant.Outlined" Color="Color.Success" Class="mb-3" />
+                        <MudTextField Value="@_employee.HealthProviderName" Label="🏥 Proveedor de Salud"
+                                      ReadOnly="true" Variant="Variant.Outlined" />
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" md="6">
@@ -142,10 +237,14 @@ else if (_employee != null)
                                 <MudTextField Value="@_employee.BankName" Label="Banco" ReadOnly="true" Variant="Variant.Outlined" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.BankAccountType" Label="Tipo de Cuenta" ReadOnly="true" Variant="Variant.Outlined" />
+                                <MudTextField Value="@(_employee.BankAccountType ?? "N/A")" Label="Tipo de Cuenta" ReadOnly="true" Variant="Variant.Outlined" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.BankAccountNumber" Label="Número de Cuenta" ReadOnly="true" Variant="Variant.Outlined" />
+                                <MudTextField Value="@(_employee.BankAccountNumber ?? "N/A")" Label="Número de Cuenta" ReadOnly="true" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField Value="@(_employee.BankBeneficiaryName ?? "N/A")" Label="👤 Titular de la Cuenta"
+                                              ReadOnly="true" Variant="Variant.Outlined" Color="Color.Info" />
                             </MudItem>
                         </MudGrid>
                     </MudPaper>
@@ -153,20 +252,18 @@ else if (_employee != null)
             </MudGrid>
         </MudTabPanel>
 
-        <!-- PESTAÑA 3: DOCUMENTOS (CÉDULA) -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 3: DOCUMENTOS (CÉDULA) *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Documentos" Icon="@Icons.Material.Filled.Folder">
             <MudGrid Class="mt-2">
-                <!-- Cédula Frontal -->
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="1">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">🪪 Cédula Frontal</MudText>
-
                         @if (!string.IsNullOrEmpty(_employee.IdFrontUrl))
                         {
-                            <img src="@GetFullImageUrl(_employee.IdFrontUrl)"
-                                 alt="Cédula Frontal"
-                                 style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid #ccc;"
-                                 class="mb-3" />
+                            <img src="@GetFullImageUrl(_employee.IdFrontUrl)" alt="Cédula Frontal"
+                                 style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid #ccc;" class="mb-3" />
                             <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
                                        OnClick="@(async () => await ClearDocument("IdFrontUrl"))" Class="mb-2">
                                 🗑️ Eliminar
@@ -177,31 +274,22 @@ else if (_employee != null)
                             <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" Color="Color.Default" Class="mb-3" />
                             <MudText Class="mb-3">No hay imagen cargada</MudText>
                         }
-
                         <InputFile id="idFrontUpload" style="display: none;"
-                                   OnChange="@(e => HandleFileUpload(e, "id-front"))"
-                                   accept="image/*,.pdf" />
+                                   OnChange="@(e => HandleFileUpload(e, "id-front"))" accept="image/*,.pdf" />
                         <label for="idFrontUpload" class="mud-button-root mud-button-filled mud-button-filled-primary mud-button-filled-size-medium mud-ripple"
                                style="cursor: pointer; padding: 8px 22px; background-color: var(--mud-palette-primary); color: white; border-radius: 4px; display: inline-flex; align-items: center; gap: 8px;">
-                            <svg class="mud-icon-root mud-svg-icon mud-icon-size-medium" focusable="false" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
-                            </svg>
-                            <span>@(string.IsNullOrEmpty(_employee.IdFrontUrl) ? "Subir Cédula Frontal" : "Reemplazar")</span>
+                            📤 @(string.IsNullOrEmpty(_employee.IdFrontUrl) ? "Subir Cédula Frontal" : "Reemplazar")
                         </label>
                     </MudPaper>
                 </MudItem>
 
-                <!-- Cédula Trasera -->
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="1">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">🪪 Cédula Trasera</MudText>
-
                         @if (!string.IsNullOrEmpty(_employee.IdBackUrl))
                         {
-                            <img src="@GetFullImageUrl(_employee.IdBackUrl)"
-                                 alt="Cédula Trasera"
-                                 style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid #ccc;"
-                                 class="mb-3" />
+                            <img src="@GetFullImageUrl(_employee.IdBackUrl)" alt="Cédula Trasera"
+                                 style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid #ccc;" class="mb-3" />
                             <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
                                        OnClick="@(async () => await ClearDocument("IdBackUrl"))" Class="mb-2">
                                 🗑️ Eliminar
@@ -212,23 +300,20 @@ else if (_employee != null)
                             <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" Color="Color.Default" Class="mb-3" />
                             <MudText Class="mb-3">No hay imagen cargada</MudText>
                         }
-
                         <InputFile id="idBackUpload" style="display: none;"
-                                   OnChange="@(e => HandleFileUpload(e, "id-back"))"
-                                   accept="image/*,.pdf" />
+                                   OnChange="@(e => HandleFileUpload(e, "id-back"))" accept="image/*,.pdf" />
                         <label for="idBackUpload" class="mud-button-root mud-button-filled mud-button-filled-primary mud-button-filled-size-medium mud-ripple"
                                style="cursor: pointer; padding: 8px 22px; background-color: var(--mud-palette-primary); color: white; border-radius: 4px; display: inline-flex; align-items: center; gap: 8px;">
-                            <svg class="mud-icon-root mud-svg-icon mud-icon-size-medium" focusable="false" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
-                            </svg>
-                            <span>@(string.IsNullOrEmpty(_employee.IdBackUrl) ? "Subir Cédula Trasera" : "Reemplazar")</span>
+                            📤 @(string.IsNullOrEmpty(_employee.IdBackUrl) ? "Subir Cédula Trasera" : "Reemplazar")
                         </label>
                     </MudPaper>
                 </MudItem>
             </MudGrid>
         </MudTabPanel>
 
-        <!-- PESTAÑA 4: DATOS FISCALES Y LEGALES -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 4: DATOS FISCALES Y LEGALES *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Fiscal y Legal" Icon="@Icons.Material.Filled.Gavel">
             <MudGrid Class="mt-2">
                 <MudItem xs="12" md="6">
@@ -248,18 +333,27 @@ else if (_employee != null)
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">🌍 Trabajador Extranjero</MudText>
-                        <MudGrid>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField Value="@(_employee.Nationality ?? "N/A")" Label="Nacionalidad" ReadOnly="true" Variant="Variant.Outlined" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField Value="@(_employee.WorkPermitNumber ?? "N/A")" Label="N° Permiso de Trabajo" ReadOnly="true" Variant="Variant.Outlined" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField Value="@(_employee.WorkPermitExpirationDate?.ToString("dd/MM/yyyy") ?? "N/A")"
-                                              Label="Vencimiento Permiso" ReadOnly="true" Variant="Variant.Outlined" />
-                            </MudItem>
-                        </MudGrid>
+                        @if (!string.IsNullOrEmpty(_employee.Nationality))
+                        {
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField Value="@_employee.Nationality" Label="Nacionalidad" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField Value="@(_employee.WorkPermitNumber ?? "N/A")" Label="N° Permiso de Trabajo" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField Value="@(_employee.WorkPermitExpirationDate?.ToString("dd/MM/yyyy") ?? "N/A")"
+                                                  Label="Vencimiento Permiso" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Normal" Dense="true">
+                                <MudText Typo="Typo.body2">Este empleado es nacional (nicaragüense)</MudText>
+                            </MudAlert>
+                        }
                     </MudPaper>
                 </MudItem>
 
@@ -273,21 +367,28 @@ else if (_employee != null)
             </MudGrid>
         </MudTabPanel>
 
-        <!-- PESTAÑA 5: CONDICIONES ESPECIALES -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 5: CONDICIONES ESPECIALES *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Condiciones" Icon="@Icons.Material.Filled.Tune">
             <MudGrid Class="mt-2">
+                @* ── Estado y Período de Prueba ── *@
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">⚙️ Estado y Período de Prueba</MudText>
                         <MudGrid>
                             <MudItem xs="12" sm="6">
-                                <MudTextField Value="@_employee.EmploymentStatus"
+                                <MudTextField Value="@GetStatusText(_employee.EmploymentStatus)"
                                               Label="Estado Laboral" ReadOnly="true" Variant="Variant.Outlined"
                                               Color="@GetStatusColor(_employee.EmploymentStatus)" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudCheckBox T="bool" Value="@_employee.IsTrustEmployee"
                                              Label="Empleado de Confianza (Art. 44)" ReadOnly="true" Color="Color.Primary" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudCheckBox T="bool" Value="@_employee.UsesTimeClock"
+                                             Label="Usa Reloj de Marcas" ReadOnly="true" Color="Color.Info" />
                             </MudItem>
                             <MudItem xs="12" sm="6">
                                 <MudTextField Value="@(_employee.ProbationStartDate?.ToString("dd/MM/yyyy") ?? "N/A")"
@@ -309,6 +410,22 @@ else if (_employee != null)
                     </MudPaper>
                 </MudItem>
 
+                @* ── Grupo de Nómina ── *@
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="0">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">💼 Grupo de Nómina</MudText>
+                        <MudTextField Value="@(_employee.PayrollGroupName ?? "No asignado")"
+                                      Label="Nombre del Grupo" ReadOnly="true" Variant="Variant.Outlined" Color="Color.Primary" Class="mb-3" />
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            <MudText Typo="Typo.body2">
+                                ℹ️ El grupo de nómina determina en qué colilla se procesará el pago de este empleado.
+                                Se puede modificar desde <strong>"Editar Empleado"</strong>.
+                            </MudText>
+                        </MudAlert>
+                    </MudPaper>
+                </MudItem>
+
+                @* ── Beneficios en Especie ── *@
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">💼 Beneficios en Especie</MudText>
@@ -334,7 +451,8 @@ else if (_employee != null)
                     </MudPaper>
                 </MudItem>
 
-                @if (_employee.EmploymentStatus == EmploymentStatus.Suspended)
+                @* ── Suspensión (condicional) ── *@
+                @if (_employee.EmploymentStatus == "Suspended")
                 {
                     <MudItem xs="12">
                         <MudPaper Class="pa-4" Elevation="0">
@@ -363,25 +481,26 @@ else if (_employee != null)
             </MudGrid>
         </MudTabPanel>
 
-        <!-- PESTAÑA 6: TURNOS Y HORARIOS -->
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 6: TURNOS Y HORARIOS *@
+        @* ═══════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Turnos" Icon="@Icons.Material.Filled.Schedule">
             <MudGrid Class="mt-2">
                 <MudItem xs="12">
                     <MudPaper Class="pa-4" Elevation="0">
                         <MudText Typo="Typo.subtitle1" Class="mb-3">⏱️ Turno Actual Asignado</MudText>
-
                         @if (!string.IsNullOrEmpty(_employee.CurrentShiftName))
                         {
                             <MudGrid>
-                                <MudItem xs="12" sm="6">
+                                <MudItem xs="12" sm="4">
                                     <MudTextField Value="@_employee.CurrentShiftName"
                                                   Label="Nombre del Turno" ReadOnly="true" Variant="Variant.Outlined" Color="Color.Primary" />
                                 </MudItem>
-                                <MudItem xs="12" sm="6">
+                                <MudItem xs="12" sm="4">
                                     <MudTextField Value="@_employee.CurrentShiftSchedule"
                                                   Label="Horario" ReadOnly="true" Variant="Variant.Outlined" />
                                 </MudItem>
-                                <MudItem xs="12" sm="6">
+                                <MudItem xs="12" sm="4">
                                     <MudTextField Value="@(_employee.ShiftAssignmentStartDate?.ToString("dd/MM/yyyy") ?? "N/A")"
                                                   Label="Asignado Desde" ReadOnly="true" Variant="Variant.Outlined" />
                                 </MudItem>
@@ -390,7 +509,7 @@ else if (_employee != null)
                         else
                         {
                             <MudAlert Severity="Severity.Warning" Dense="true">
-                                <MudText Typo="Typo.body2">⚠️ Este empleado no tiene un turno asignado. Configure el turno mediante "Acciones de Personal".</MudText>
+                                <MudText Typo="Typo.body2">⚠️ Este empleado no tiene un turno asignado. Configure mediante "Acciones de Personal".</MudText>
                             </MudAlert>
                         }
                     </MudPaper>
@@ -409,20 +528,137 @@ else if (_employee != null)
             </MudGrid>
         </MudTabPanel>
 
-    </MudTabs>
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* PESTAÑA 7: CREDENCIAL Y CÓDIGOS *@
+        @* ═══════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Credencial" Icon="@Icons.Material.Filled.Badge">
+    <MudGrid Class="mt-2">
+        @* ── VISTA PREVIA DE LA CREDENCIAL ── *@
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">👁️ Vista Previa de la Credencial</MudText>
+                
+                <div style="width: 100%; max-width: 400px; margin: 0 auto; border: 3px solid #1565c0; border-radius: 8px; overflow: hidden; font-family: Arial, sans-serif;">
+                    
+                    @* Encabezado azul *@
+                    <div style="background: #1565c0; color: white; padding: 10px; text-align: center;">
+                        <div style="font-size: 14px; font-weight: bold;">DISTRIBUIDORA COMERCIAL DE NICARAGUA, S.A.</div>
+                        <div style="font-size: 10px; opacity: 0.9;">CREDENCIAL DE EMPLEADO</div>
+                    </div>
+                    
+                    @* Cuerpo *@
+                    <div style="padding: 15px; display: flex; gap: 15px;">
+                        
+                        @* Lado izquierdo: Foto + Datos *@
+                        <div style="flex: 2;">
+                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                @* Foto *@
+                                <div style="width: 70px; height: 85px; border: 2px solid #1565c0; border-radius: 4px; overflow: hidden; background: #e3f2fd; display: flex; align-items: center; justify-content: center;">
+                                    @if (!string.IsNullOrEmpty(_employee?.PhotoUrl))
+                                    {
+                                        <img src="@GetFullImageUrl(_employee.PhotoUrl)" 
+                                             style="width: 100%; height: 100%; object-fit: cover;" />
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 24px; color: #1565c0; font-weight: bold;">
+                                            @GetInitials(_employee?.FirstName ?? "", _employee?.LastName ?? "")
+                                        </span>
+                                    }
+                                </div>
+                                
+                                @* Nombre y puesto *@
+                                <div style="flex: 1;">
+                                    <div style="font-size: 13px; font-weight: bold; color: #1565c0;">
+                                        @_employee?.FirstName @_employee?.LastName
+                                    </div>
+                                    <div style="font-size: 10px; color: #666;">
+                                        @_employee?.JobPositionName
+                                    </div>
+                                    <div style="font-size: 9px; color: #999;">
+                                        @_employee?.JobGradeName
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            @* Datos de identificación *@
+                            <div style="border-top: 1px solid #eee; padding-top: 8px; font-size: 10px;">
+                                <div><strong>CÉDULA:</strong> @_employee?.Identification</div>
+                                <div><strong>INSS:</strong> @(_employee?.NOINSS ?? "N/A")</div>
+                                <div><strong>SUCURSAL:</strong> @(_employee?.BranchName ?? "N/A")</div>
+                                <div><strong>GRUPO:</strong> @(_employee?.PayrollGroupName ?? "N/A")</div>
+                            </div>
+                        </div>
+                        
+                        @* Lado derecho: QR *@
+                        <div style="flex: 1; text-align: center;">
+                            <img src="@GetApiUrl($"/api/employees/{Id}/qrcode")" 
+                                 alt="QR" 
+                                 style="width: 110px; height: 110px; border: 1px solid #ddd;" />
+                            <div style="font-size: 12px; font-weight: bold; color: #1565c0; margin-top: 5px;">
+                                @_employee?.Code
+                            </div>
+                            <div style="font-size: 9px; padding: 2px 6px; border-radius: 3px; margin-top: 3px; display: inline-block;
+                                        background: @(_employee?.EmploymentStatus == "Active" ? "#2e7d32" : _employee?.EmploymentStatus == "Suspended" ? "#f57c00" : "#c62828"); 
+                                        color: white;">
+                                @GetStatusText(_employee?.EmploymentStatus)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    @* Pie *@
+                    <div style="background: #f5f5f5; padding: 5px 10px; font-size: 8px; color: #999; text-align: center; border-top: 1px solid #eee;">
+                        Emitido: @DateTime.Now.ToString("dd/MM/yyyy HH:mm") | Este documento es propiedad de la empresa
+                    </div>
+                </div>
+            </MudPaper>
+        </MudItem>
 
-    <!-- BOTONES DE ACCIÓN GLOBAL -->
-    <div class="d-flex gap-2 mt-4">
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="GoBack">
-            Volver al Listado
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditEmployee">
-            ✏️ Editar Empleado
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintFicha">
-            🖨️ Imprimir Ficha
-        </MudButton>
-    </div>
+        @* ── ACCIONES ── *@
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">🎯 Acciones Disponibles</MudText>
+                
+                <MudStack Spacing="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.Print" 
+                               Size="Size.Large"
+                               FullWidth="true"
+                               OnClick="PrintCredential">
+                        🖨️ Imprimir Credencial
+                    </MudButton>
+                    
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" 
+                               StartIcon="@Icons.Material.Filled.Download" 
+                               Size="Size.Large"
+                               FullWidth="true"
+                               OnClick="DownloadQrCode">
+                        📥 Descargar QR
+                    </MudButton>
+                </MudStack>
+                
+                <MudDivider Class="my-4" />
+                
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    <strong>ℹ️ Información:</strong>
+                </MudText>
+                        <MudList T="string" Dense="true" Class="mt-2">
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.QrCode">
+                                El código QR se usa para verificar identidad y registrar asistencia
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf">
+                                La credencial se imprime en tamaño tipo gafete (10cm x 7cm)
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Security">
+                                El QR contiene un código único que valida al empleado
+                            </MudListItem>
+                        </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudTabPanel>
+
+    </MudTabs>
 }
 else
 {
@@ -434,6 +670,8 @@ else
 
     private bool _isLoading = true;
     private EmployeeDetailDto? _employee;
+    private string? _qrBase64; 
+    private string? _qrError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -446,7 +684,6 @@ else
         try
         {
             var response = await Http.GetAsync($"api/employees/{Id}");
-
             if (response.IsSuccessStatusCode)
             {
                 _employee = await response.Content.ReadFromJsonAsync<EmployeeDetailDto>();
@@ -487,7 +724,6 @@ else
                 var pdfBytes = await response.Content.ReadAsByteArrayAsync();
                 var base64String = Convert.ToBase64String(pdfBytes);
                 var fileName = $"Ficha_Empleado_{_employee?.Identification ?? Id.ToString()}.pdf";
-
                 await JS.InvokeVoidAsync("downloadFileFromBase64", base64String, "application/pdf", fileName);
                 Snackbar.Add("🖨️ Ficha descargada exitosamente", Severity.Success);
             }
@@ -501,13 +737,6 @@ else
         {
             Snackbar.Add($"❌ Error de conexión: {ex.Message}", Severity.Error);
         }
-    }
-
-    // ✅ MÉTODOS PARA SUBIDA DE ARCHIVOS (Corregidos)
-    private async Task TriggerFileUpload(string inputId)
-    {
-        // Llama a la función JS global que creamos en index.html
-        await JS.InvokeVoidAsync("blazorTriggerClick", inputId);
     }
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e, string docType)
@@ -543,7 +772,7 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("✅ Documento subido exitosamente", Severity.Success);
-                await LoadEmployeeDetail(); // Recargar para mostrar la nueva imagen
+                await LoadEmployeeDetail();
             }
             else
             {
@@ -559,13 +788,10 @@ else
 
     private async Task ClearDocument(string propertyName)
     {
-        // ✅ Usar la instancia en minúscula para evitar conflicto con el nombre de la clase
         bool? confirmed = await dialogService.ShowMessageBox(
             "⚠️ Confirmar eliminación",
-            "¿Está seguro de eliminar este documento? Esta acción no se puede deshacer y se borrará del servidor.",
-            yesText: "Sí, eliminar",
-            noText: "Cancelar"
-        );
+            "¿Está seguro de eliminar este documento? Esta acción no se puede deshacer.",
+            yesText: "Sí, eliminar", noText: "Cancelar");
 
         if (confirmed == true)
         {
@@ -580,11 +806,10 @@ else
                 };
 
                 var response = await Http.DeleteAsync($"api/employees/{Id}/documents/{routeType}");
-
                 if (response.IsSuccessStatusCode)
                 {
                     Snackbar.Add("✅ Documento eliminado exitosamente", Severity.Success);
-                    await LoadEmployeeDetail(); // Recargar para mostrar el placeholder
+                    await LoadEmployeeDetail();
                 }
                 else
                 {
@@ -599,7 +824,10 @@ else
         }
     }
 
-    // ✅ MÉTODO DE INICIALES (Corregido con comillas dobles)
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTODOS HELPER
+    // ═══════════════════════════════════════════════════════════════
+
     private string GetInitials(string firstName, string lastName)
     {
         var f = string.IsNullOrEmpty(firstName) ? "" : firstName.Substring(0, 1).ToUpper();
@@ -607,26 +835,215 @@ else
         return $"{f}{l}";
     }
 
-   
-
     private string GetFullImageUrl(string? relativeUrl)
     {
         if (string.IsNullOrEmpty(relativeUrl)) return "";
         if (relativeUrl.StartsWith("http")) return relativeUrl;
-
         var apiBase = Config["ApiBaseUrl"] ?? "https://localhost:7119";
         return $"{apiBase.TrimEnd('/')}{relativeUrl}";
     }
 
-    private Color GetStatusColor(Gestiona360.Payroll.Domain.Shared.Frontend.EmploymentStatus status)
+    private Color GetStatusColor(string? status) => status switch
     {
-        return status switch
-        {
-            Gestiona360.Payroll.Domain.Shared.Frontend.EmploymentStatus.Active => Color.Success,
-            Gestiona360.Payroll.Domain.Shared.Frontend.EmploymentStatus.Suspended => Color.Warning,
-            Gestiona360.Payroll.Domain.Shared.Frontend.EmploymentStatus.Terminated => Color.Error,
-            _ => Color.Default
-        };
+        "Active" => Color.Success,
+        "Suspended" => Color.Warning,
+        "Terminated" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(string? status) => status switch
+    {
+        "Active" => "✅ Activo",
+        "Suspended" => "⏸️ Suspendido",
+        "Terminated" => "⏹️ Terminado",
+        _ => "❓ Desconocido"
+    };
+
+    private string GetGenderText(string? gender) => gender switch
+    {
+        "M" => "Masculino",
+        "F" => "Femenino",
+        _ => "No especificado"
+    };
+
+    private string GetMaritalStatusText(string? status) => status switch
+    {
+        "S" => "Soltero/a",
+        "C" => "Casado/a",
+        "U" => "Unión libre",
+        "D" => "Divorciado/a",
+        "V" => "Viudo/a",
+        _ => "No especificado"
+    };
+
+    private string GetAntiguedad(DateTime hireDate)
+    {
+        var now = DateTime.Now;
+        var years = now.Year - hireDate.Year;
+        var months = now.Month - hireDate.Month;
+        if (months < 0) { years--; months += 12; }
+        if (years > 0) return $"{years} año{(years > 1 ? "s" : "")}, {months} mes{(months != 1 ? "es" : "")}";
+        if (months > 0) return $"{months} mes{(months > 1 ? "es" : "")}";
+        return "Recién ingresado";
     }
 
+    private async Task PrintCredential()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/employees/{Id}/credential-pdf");
+            if (response.IsSuccessStatusCode)
+            {
+                var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64String = Convert.ToBase64String(pdfBytes);
+                var fileName = $"Credencial_{_employee?.Code ?? Id.ToString()}.pdf";
+
+                await JS.InvokeVoidAsync("downloadFileFromBase64", base64String, "application/pdf", fileName);
+                Snackbar.Add("🖨️ Credencial descargada exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("❌ Error al generar la credencial", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _employee != null)
+        {
+            // 1. Cargar el QR como base64
+            await LoadQrCodeAsync();
+
+            // 2. Generar el código de barras con JsBarcode
+            await GenerateBarcodeAsync();
+        }
+    }
+
+    // ✅ MÉTODO NUEVO: Cargar QR desde el backend
+    private async Task LoadQrCodeAsync()
+    {
+        try
+        {
+            Console.WriteLine($"🔍 Intentando cargar QR para empleado {Id}");
+
+            var response = await Http.GetAsync($"api/employees/{Id}/qrcode");
+
+            Console.WriteLine($"📡 Respuesta del servidor: {(int)response.StatusCode} {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var qrBytes = await response.Content.ReadAsByteArrayAsync();
+                Console.WriteLine($"✅ QR recibido: {qrBytes.Length} bytes");
+
+                var base64String = Convert.ToBase64String(qrBytes);
+                _qrBase64 = $"data:image/png;base64,{base64String}";
+                _qrError = null;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _qrError = $"Error {(int)response.StatusCode}: {errorContent}";
+                Console.WriteLine($"❌ Error cargando QR: {_qrError}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _qrError = $"Error de conexión: {ex.Message}";
+            Console.WriteLine($"❌ Excepción cargando QR: {ex.Message}");
+        }
+
+        StateHasChanged();
+    }
+
+    // ✅ MÉTODO NUEVO: Generar código de barras con JsBarcode
+    private async Task GenerateBarcodeAsync()
+    {
+        try
+        {
+            Console.WriteLine($"🔍 Intentando generar código de barras para {Id}");
+
+            var response = await Http.GetFromJsonAsync<BarcodePayloadResponse>($"api/employees/{Id}/barcode-payload");
+
+            if (response != null && !string.IsNullOrEmpty(response.payload))
+            {
+                Console.WriteLine($"✅ Payload recibido: {response.payload}");
+
+                var elementId = $"barcode-{Id.ToString("N")}";
+                Console.WriteLine($"🎯 ID del elemento SVG: #{elementId}");
+
+                // Llamar a la función JavaScript global
+                var success = await JS.InvokeAsync<bool>("generateBarcode", elementId, response.payload);
+
+                if (success)
+                {
+                    Console.WriteLine("✅ Código de barras generado correctamente");
+                }
+                else
+                {
+                    Console.WriteLine("❌ La función JS retornó false");
+                    Snackbar.Add("⚠️ No se pudo generar el código de barras", Severity.Warning);
+                }
+            }
+            else
+            {
+                Console.WriteLine("❌ No se recibió payload del backend");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error generando código de barras: {ex.Message}");
+            Snackbar.Add($"⚠️ Error código barras: {ex.Message}", Severity.Warning);
+        }
+    }
+
+
+    private async Task DownloadQrCode()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/employees/{Id}/qrcode");
+            if (response.IsSuccessStatusCode)
+            {
+                var qrBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64String = Convert.ToBase64String(qrBytes);
+                var fileName = $"QR_{_employee?.Code ?? Id.ToString()}.png";
+
+                await JS.InvokeVoidAsync("downloadFileFromBase64", base64String, "image/png", fileName);
+                Snackbar.Add("📥 Código QR descargado exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("❌ Error al descargar el QR", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"❌ Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ✅ MÉTODO SIMPLE: Obtener URL completa del API
+    private string GetApiUrl(string endpoint)
+    {
+        var apiBase = Config["ApiBaseUrl"] ?? "https://localhost:7119";
+        return $"{apiBase.TrimEnd('/')}{endpoint}";
+    }
+
+    // ✅ MÉTODO SIMPLE: URL de API pública para código de barras
+    private string GetBarcodeApiUrl(string code)
+    {
+        // Usamos API gratuita de TEC-IT (no requiere registro)
+        return $"https://barcode.tec-it.com/barcode.ashx?data={Uri.EscapeDataString(code)}&code=Code128&multibar=1&width=300&height=100&dpi=96&imagetype=Png&rotation=0&color=%23000000&bgcolor=%23ffffff&qunit=Mm&quiet=0";
+    }
+
+
+    private class BarcodePayloadResponse
+    {
+        public string payload { get; set; } = string.Empty;
+    }
 }

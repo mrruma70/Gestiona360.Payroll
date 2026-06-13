@@ -73,5 +73,28 @@ namespace Gestiona360.Payroll.Domain.Entities
 
         public int? OldEmploymentStatus { get; set; }
         public int? NewEmploymentStatus { get; set; }
+
+        public int? OldBankId { get; set; }
+        public string? OldBankAccountNumber { get; set; }
+        public Guid? OldHealthProviderId { get; set; }
+ 
+        public int? NewBankId { get; set; }
+        public string? NewBankAccountNumber { get; set; }
+        public Guid? NewHealthProviderId { get; set; }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CAMPOS DE SUSPENSIÓN (NUEVOS)
+        // ═══════════════════════════════════════════════════════════════
+        public string? SuspensionType { get; set; }
+        public DateTime? SuspensionStartDate { get; set; }
+        public DateTime? SuspensionEndDate { get; set; }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CAMPOS DE TERMINACIÓN (NUEVOS)
+        // ═══════════════════════════════════════════════════════════════
+        public string? TerminationTypeName { get; set; }
+        public decimal? IndemnityAmount { get; set; }
+        public bool? IsJustified { get; set; }
+        public string? RejectionReason { get; set; }
     }
 }

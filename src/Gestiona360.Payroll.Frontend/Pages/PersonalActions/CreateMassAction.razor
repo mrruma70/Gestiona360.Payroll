@@ -1,0 +1,552 @@
+﻿@page "/personal-actions/mass"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions
+
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Nueva Acción Masiva | Gestiona360</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+
+    @if (_isBusy)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    }
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h5">
+            <MudIcon Icon="@Icons.Material.Filled.Groups" Class="mr-2" />
+            Nueva Acción Masiva
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+            Configura la acción, selecciona los empleados y ejecuta la creación del lote.
+        </MudText>
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">1. Tipo de acción</MudText>
+
+                <MudSelect T="string"
+                           Value="_dto.ActionType"
+                           ValueChanged="OnActionTypeChanged"
+                           Label="Seleccione el tipo"
+                           Variant="Variant.Outlined"
+                           Required="true">
+                    <MudSelectItem Value="@("MassSuspension")">Suspensión colectiva</MudSelectItem>
+                    <MudSelectItem Value="@("SalaryChange")">Ajuste salarial general</MudSelectItem>
+                    <MudSelectItem Value="@("CostCenterChange")">Cambio de centro de costo</MudSelectItem>
+                </MudSelect>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">2. Parámetros</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string"
+                                      @bind-Value="_dto.BatchReference"
+                                      Label="Referencia del lote"
+                                      Variant="Variant.Outlined"
+                                      Required="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string"
+                                      @bind-Value="_dto.CausalDescription"
+                                      Label="Causal legal"
+                                      Variant="Variant.Outlined"
+                                      Required="true" />
+                    </MudItem>
+
+                    @if (_dto.ActionType == "MassSuspension")
+                    {
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                          @bind-Value="_dto.MitrabAuthorizationNumber"
+                                          Label="Nº autorización MITRAB"
+                                          Variant="Variant.Outlined"
+                                          Required="true" />
+                        </MudItem>
+                    }
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_effectiveDate"
+                                       Label="Fecha de efecto"
+                                       Variant="Variant.Outlined"
+                                       Required="true" />
+                    </MudItem>
+
+                    @if (_dto.ActionType == "MassSuspension")
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="_endDate"
+                                           Label="Fecha fin"
+                                           Variant="Variant.Outlined" />
+                        </MudItem>
+                    }
+
+                    @if (_dto.ActionType == "SalaryChange")
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string"
+                                       @bind-Value="_ruleType"
+                                       Label="Tipo de regla"
+                                       Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("Fixed")">Monto fijo (C$)</MudSelectItem>
+                                <MudSelectItem Value="@("Percentage")">Porcentaje (%)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="decimal?"
+                                             @bind-Value="_ruleValue"
+                                             Label="Valor de la regla"
+                                             Variant="Variant.Outlined"
+                                             Required="true" />
+                        </MudItem>
+                    }
+
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_dto.Justification"
+                                      Label="Justificación"
+                                      Lines="4"
+                                      Variant="Variant.Outlined"
+                                      Required="true" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">3. Empleados</MudText>
+
+                <MudGrid Class="mb-3">
+                    <MudItem xs="12" sm="8">
+                        <MudTextField T="string"
+                                      @bind-Value="_employeeSearch"
+                                      Label="Buscar por código o nombre"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4" Class="d-flex align-center justify-end">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   OnClick="SelectAllFiltered"
+                                   Class="mr-2">
+                            Seleccionar visibles
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Default"
+                                   OnClick="ClearSelection">
+                            Limpiar
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+
+                @if (_employeesLoading)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Large" Class="my-4" />
+                }
+                else if (!_employees.Any())
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        No se pudieron cargar empleados activos.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="@FilteredEmployees"
+                              Dense="true"
+                              Hover="true"
+                              Striped="true"
+                              Height="420px"
+                              FixedHeader="true">
+
+                        <HeaderContent>
+                            <MudTh Style="width: 60px;">Sel.</MudTh>
+                            <MudTh Style="width: 120px;">Código</MudTh>
+                            <MudTh>Empleado</MudTh>
+                            <MudTh Style="width: 140px;">Salario</MudTh>
+                            @if (_dto.ActionType == "SalaryChange")
+                            {
+                                <MudTh Style="width: 150px;">Proyección</MudTh>
+                            }
+                        </HeaderContent>
+
+                        <RowTemplate>
+                            <MudTd DataLabel="Sel.">
+                                <MudCheckBox T="bool"
+                                             Value="@IsSelected(context.Id)"
+                                             ValueChanged="@(value => ToggleEmployeeSelection(context.Id, value))" />
+                            </MudTd>
+
+                            <MudTd DataLabel="Código">@context.Code</MudTd>
+                            <MudTd DataLabel="Empleado">@context.FullName</MudTd>
+                            <MudTd DataLabel="Salario">C$ @context.BaseSalary.ToString("N2")</MudTd>
+
+                            @if (_dto.ActionType == "SalaryChange")
+                            {
+                                <MudTd DataLabel="Proyección">
+                                    @if (_ruleValue.HasValue)
+                                    {
+                                        <MudText Typo="Typo.body2" Style="font-weight:600;">
+                                            C$ @CalculateProjectedSalary(context.BaseSalary).ToString("N2")
+                                        </MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Pendiente</MudText>
+                                    }
+                                </MudTd>
+                            }
+                        </RowTemplate>
+
+                        <NoRecordsContent>
+                            <MudText Class="pa-4">No hay empleados que coincidan con la búsqueda.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">4. Documentos de respaldo</MudText>
+
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    Esta pantalla conserva la referencia local de archivos seleccionados. La carga binaria al servidor no se envía desde aquí mientras el API no exponga un endpoint específico de adjuntos.
+                </MudAlert>
+
+                <InputFile OnChange="OnFileSelected" multiple />
+
+                @if (_uploadedFiles.Any())
+                {
+                    <div class="mt-3">
+                        @foreach (var file in _uploadedFiles)
+                        {
+                            <MudChip T="string" Size="Size.Small" Class="ma-1">@file</MudChip>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="3" Style="position: sticky; top: 20px;">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Resumen</MudText>
+
+                <MudList T="string" Dense="true">
+                    <MudListItem>
+                        <MudText Typo="Typo.body2"><strong>Tipo:</strong> @GetActionTypeLabel(_dto.ActionType)</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.body2"><strong>Lote:</strong> @(_dto.BatchReference ?? "—")</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.body2"><strong>Fecha efecto:</strong> @(_effectiveDate?.ToString("dd/MM/yyyy") ?? "—")</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.body2"><strong>Seleccionados:</strong> @_selectedEmployeeIds.Count</MudText>
+                    </MudListItem>
+
+                    @if (_dto.ActionType == "SalaryChange")
+                    {
+                        <MudListItem>
+                            <MudText Typo="Typo.body2"><strong>Regla:</strong> @GetRuleDescription()</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+
+                <MudDivider Class="my-3" />
+
+                <MudCheckBox T="bool" @bind-Value="_isConfirmed" Color="Color.Warning">
+                    Confirmo la creación de esta acción masiva
+                </MudCheckBox>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Success"
+                           FullWidth="true"
+                           Class="mt-4"
+                           Disabled="@(!CanSubmit())"
+                           OnClick="ExecuteMassAction">
+                    Crear acción masiva
+                </MudButton>
+
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           FullWidth="true"
+                           Class="mt-2"
+                           OnClick="@(() => Navigation.NavigateTo("/personal-actions"))">
+                    Cancelar
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private readonly CreateMassPersonalActionDto _dto = new();
+
+    private bool _isBusy;
+    private bool _employeesLoading;
+    private bool _isConfirmed;
+
+    private DateTime? _effectiveDate = DateTime.Today;
+    private DateTime? _endDate;
+
+    private string _ruleType = "Fixed";
+    private decimal? _ruleValue;
+
+    private string _employeeSearch = string.Empty;
+
+    private readonly List<string> _uploadedFiles = new();
+    private readonly List<EmployeeLookupDto> _employees = new();
+    private readonly HashSet<Guid> _selectedEmployeeIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _dto.ActionType = "MassSuspension";
+        _dto.BatchReference = $"LOT-{DateTime.Now:yyyyMMdd}-001";
+
+        await LoadEmployees();
+    }
+
+    private IEnumerable<EmployeeLookupDto> FilteredEmployees =>
+        _employees.Where(e =>
+            string.IsNullOrWhiteSpace(_employeeSearch) ||
+            e.Code.Contains(_employeeSearch, StringComparison.OrdinalIgnoreCase) ||
+            e.FullName.Contains(_employeeSearch, StringComparison.OrdinalIgnoreCase));
+
+    private async Task LoadEmployees()
+    {
+        _employeesLoading = true;
+
+        try
+        {
+            _employees.Clear();
+
+            var employees = await Http.GetFromJsonAsync<List<EmployeeLookupDto>>("api/employees");
+            if (employees is not null)
+                _employees.AddRange(employees.OrderBy(x => x.FullName));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudieron cargar los empleados: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _employeesLoading = false;
+        }
+    }
+
+    private Task OnActionTypeChanged(string value)
+    {
+        _dto.ActionType = value;
+
+        if (_dto.ActionType != "MassSuspension")
+        {
+            _dto.MitrabAuthorizationNumber = null;
+            _endDate = null;
+        }
+
+        if (_dto.ActionType != "SalaryChange")
+        {
+            _ruleType = "Fixed";
+            _ruleValue = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private bool IsSelected(Guid employeeId) => _selectedEmployeeIds.Contains(employeeId);
+
+    private void ToggleEmployeeSelection(Guid employeeId, bool isSelected)
+    {
+        if (isSelected)
+            _selectedEmployeeIds.Add(employeeId);
+        else
+            _selectedEmployeeIds.Remove(employeeId);
+    }
+
+    private void SelectAllFiltered()
+    {
+        foreach (var employee in FilteredEmployees)
+            _selectedEmployeeIds.Add(employee.Id);
+    }
+
+    private void ClearSelection()
+    {
+        _selectedEmployeeIds.Clear();
+    }
+
+    private decimal CalculateProjectedSalary(decimal currentSalary)
+    {
+        if (!_ruleValue.HasValue)
+            return currentSalary;
+
+        return _ruleType switch
+        {
+            "Percentage" => currentSalary + (currentSalary * (_ruleValue.Value / 100m)),
+            _ => currentSalary + _ruleValue.Value
+        };
+    }
+
+    private string GetRuleDescription()
+    {
+        if (!_ruleValue.HasValue)
+            return "Pendiente";
+
+        return _ruleType == "Percentage"
+            ? $"{_ruleValue.Value:N2}%"
+            : $"C$ {_ruleValue.Value:N2}";
+    }
+
+    private bool CanSubmit()
+    {
+        if (_isBusy || !_isConfirmed)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(_dto.ActionType))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(_dto.BatchReference))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(_dto.CausalDescription))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(_dto.Justification))
+            return false;
+
+        if (!_effectiveDate.HasValue)
+            return false;
+
+        if (_selectedEmployeeIds.Count == 0)
+            return false;
+
+        if (_dto.ActionType == "MassSuspension" && string.IsNullOrWhiteSpace(_dto.MitrabAuthorizationNumber))
+            return false;
+
+        if (_dto.ActionType == "SalaryChange" && (!_ruleValue.HasValue || _ruleValue.Value <= 0))
+            return false;
+
+        return true;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _uploadedFiles.Clear();
+
+        foreach (var file in e.GetMultipleFiles())
+            _uploadedFiles.Add(file.Name);
+
+        await Task.CompletedTask;
+    }
+
+    private bool ValidateBeforeSubmit(out string errorMessage)
+    {
+        if (!CanSubmit())
+        {
+            errorMessage = "Completa todos los datos obligatorios y selecciona al menos un empleado.";
+            return false;
+        }
+
+        if (_dto.ActionType == "MassSuspension" && _endDate.HasValue && _effectiveDate.HasValue && _endDate.Value < _effectiveDate.Value)
+        {
+            errorMessage = "La fecha fin no puede ser menor que la fecha de efecto.";
+            return false;
+        }
+
+        errorMessage = string.Empty;
+        return true;
+    }
+
+    private async Task ExecuteMassAction()
+    {
+        if (!ValidateBeforeSubmit(out var validationError))
+        {
+            Snackbar.Add(validationError, Severity.Warning);
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"¿Deseas crear esta acción masiva para {_selectedEmployeeIds.Count} empleado(s)?");
+
+        if (!confirmed)
+            return;
+
+        _isBusy = true;
+
+        try
+        {
+            _dto.TargetEmployeeIds = _selectedEmployeeIds.ToList();
+            _dto.EffectiveDate = _effectiveDate!.Value;
+            _dto.EndDate = _endDate;
+            _dto.RuleType = _dto.ActionType == "SalaryChange" ? _ruleType : null;
+            _dto.RuleValue = _dto.ActionType == "SalaryChange" ? _ruleValue : null;
+
+            using var response = await Http.PostAsJsonAsync("api/personalactions", _dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Acción masiva creada correctamente.", Severity.Success);
+                Navigation.NavigateTo("/personal-actions");
+                return;
+            }
+
+            var error = await ReadErrorAsync(response);
+            Snackbar.Add($"No se pudo crear la acción masiva: {error}", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al crear la acción masiva: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            return string.IsNullOrWhiteSpace(content) ? response.ReasonPhrase ?? "Error no especificado" : content;
+        }
+        catch
+        {
+            return response.ReasonPhrase ?? "Error no especificado";
+        }
+    }
+
+    private static string GetActionTypeLabel(string? actionType) => actionType switch
+    {
+        "MassSuspension" => "Suspensión colectiva",
+        "SalaryChange" => "Ajuste salarial general",
+        "CostCenterChange" => "Cambio de centro de costo",
+        _ => "Sin definir"
+    };
+
+    private sealed class EmployeeLookupDto
+    {
+        public Guid Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public decimal BaseSalary { get; set; }
+
+        public string FullName => $"{FirstName} {LastName}".Trim();
+    }
+}

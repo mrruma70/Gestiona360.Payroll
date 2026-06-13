@@ -1,36 +1,45 @@
-﻿@* // App.razor *@
-@using Microsoft.AspNetCore.Components.Routing
-@using Gestiona360.Payroll.Frontend.Layout
+﻿@using Gestiona360.Payroll.Frontend.Layout
+@using Gestiona360.Payroll.Frontend.Theme
+@using Microsoft.AspNetCore.Components.Authorization
 @using MudBlazor
 
-<Router AppAssembly="@typeof(App).Assembly">
+<CascadingAuthenticationState>
+    <MudThemeProvider Theme="@PayrollTheme.Default" />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+    <MudPopoverProvider />
 
-    <Found Context="routeData">
-
-        <RouteView RouteData="@routeData"
-                   DefaultLayout="@typeof(MainLayout)" />
-
-        <FocusOnNavigate RouteData="@routeData"
-                         Selector="h1" />
-
-    </Found>
-
-    <NotFound>
-
-        <PageTitle>No encontrado</PageTitle>
-
-        <LayoutView Layout="@typeof(MainLayout)">
-
-            <MudText Typo="Typo.h6"
-                     Align="Align.Center"
-                     Class="mt-12">
-
-                Lo sentimos, no hay nada en esta dirección.
-
-            </MudText>
-
-        </LayoutView>
-
-    </NotFound>
-
-</Router>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData"
+                                DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Error" Class="ma-4">
+                            <MudText Typo="Typo.h6">🚫 Acceso Denegado</MudText>
+                            <MudText Typo="Typo.body2">No tienes permisos para acceder a este recurso.</MudText>
+                        </MudAlert>
+                    }
+                </NotAuthorized>
+                <Authorizing>
+                    @* ✅ Pantalla blanca invisible durante la verificación de autenticación *@
+                    <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999;"></div>
+                </Authorizing>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <MudAlert Severity="Severity.Warning" Class="ma-4">
+                    <MudText Typo="Typo.h6">🔍 Página No Encontrada</MudText>
+                    <MudText Typo="Typo.body2">La página que buscas no existe.</MudText>
+                </MudAlert>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

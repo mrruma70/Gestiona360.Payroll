@@ -1,15 +1,13 @@
 @inherits LayoutComponentBase
 @using Gestiona360.Payroll.Frontend.Theme
 @using MudBlazor
-
-<MudThemeProvider Theme="@PayrollTheme.Default" />
-
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudPopoverProvider />
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject Gestiona360.Payroll.Frontend.Auth.JwtAuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <MudLayout>
-
     <MudAppBar Elevation="1" Fixed="true"
                Style="background-color: #1a1a1a; color: #FFD700;">
         <MudIconButton Icon="@Icons.Material.Filled.Menu"
@@ -23,8 +21,15 @@
 
         <MudSpacer />
 
-        <MudText Class="mr-4 d-none d-md-block">Usuario: Admin</MudText>
-        <MudAvatar Size="Size.Small">A</MudAvatar>
+        <MudText Class="mr-4 d-none d-md-block">
+            Usuario: @_userName
+        </MudText>
+        <MudAvatar Size="Size.Small" Color="Color.Warning">
+            @_userInitial
+        </MudAvatar>
+        <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                       Color="Color.Inherit"
+                       OnClick="Logout" />
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen"
@@ -32,18 +37,76 @@
                ClipMode="DrawerClipMode.Never"
                Elevation="1"
                Style="background-color:#1a1a1a;">
-
         <NavMenu />
     </MudDrawer>
 
-    @* ✅ CORRECCIÓN: Agregado Style="padding-top: 70px;" para compensar la altura del AppBar fijo *@
     <MudMainContent Class="main-content" Style="padding-top: 70px;">
         @Body
     </MudMainContent>
-
 </MudLayout>
 
 @code {
     private bool _drawerOpen = true;
+    private string _userName = "Invitado";
+    private string _userInitial = "I";
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthenticationStateTask;
+        var user = authState.User;
+
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            // Obtener FirstName y LastName del JWT
+            var firstName = user.FindFirst("FirstName")?.Value ?? "";
+            var lastName = user.FindFirst("LastName")?.Value ?? "";
+
+            // Si no están, intentar con otros claims
+            if (string.IsNullOrEmpty(firstName) && string.IsNullOrEmpty(lastName))
+            {
+                _userName = user.FindFirst("unique_name")?.Value
+                           ?? user.FindFirst("email")?.Value
+                           ?? user.Identity.Name
+                           ?? "Usuario";
+            }
+            else
+            {
+                _userName = $"{firstName} {lastName}".Trim();
+            }
+
+            _userInitial = string.IsNullOrEmpty(_userName) ? "U" : _userName.Substring(0, 1).ToUpper();
+
+            // DEBUG: Ver los claims en consola
+            Console.WriteLine("=== CLAIMS DEL USUARIO ===");
+            foreach (var claim in user.Claims)
+            {
+                Console.WriteLine($"{claim.Type}: {claim.Value}");
+            }
+        }
+        else
+        {
+            _userName = "Invitado";
+            _userInitial = "I";
+        }
+    }
+
     private void DrawerToggle() => _drawerOpen = !_drawerOpen;
+
+    private async Task Logout()
+    {
+        // ✅ 1. Cerrar sesión (esto notifica a Blazor inmediatamente)
+        await AuthStateProvider.Logout();
+
+        // ✅ 2. Pequeño delay para que Blazor procese el cambio de estado
+        await Task.Delay(100);
+
+        // ✅ 3. Redirigir SIN recargar (forceLoad: false)
+        Navigation.NavigateTo("/login", forceLoad: false);
+
+        // ✅ Logout instantáneo con JavaScript
+        //await JS.InvokeVoidAsync("logoutUser");
+    }
 }

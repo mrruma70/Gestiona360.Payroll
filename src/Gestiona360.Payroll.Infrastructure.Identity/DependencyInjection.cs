@@ -1,4 +1,6 @@
-﻿using Gestiona360.Payroll.Domain.Entities; // Donde reside ApplicationUser
+﻿using Gestiona360.Payroll.Application.Contracts;
+using Gestiona360.Payroll.Domain.Entities; // Donde reside ApplicationUser
+using Gestiona360.Payroll.Infrastructure.Identity.Services;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +19,11 @@ namespace Gestiona360.Payroll.Infrastructure.Identity
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
 
-           
+
+            // Registrar la interfaz
+            services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
+
+            services.AddScoped<ITokenGenerationService, TokenGenerationService>();
 
             return services;
         }

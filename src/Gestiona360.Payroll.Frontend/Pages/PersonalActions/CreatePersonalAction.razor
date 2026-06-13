@@ -1,0 +1,868 @@
+﻿@page "/personal-actions/create"
+@using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Json
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+
+<PageTitle>Nueva Acción Individual | Gestiona360</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4 mb-8">
+    <MudPaper Class="pa-6" Elevation="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+            <MudText Typo="Typo.h5"><b>➕ Nueva Acción de Personal (Individual)</b></MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Close" OnClick="Cancel">X Cancelar</MudButton>
+        </MudStack>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">📌 CONTEXTO DE APLICACIÓN</MudText>
+        <MudAlert Severity="@(_periodInfo?.IsOpen == true ? Severity.Success : Severity.Warning)" Class="mb-6" Icon="@Icons.Material.Filled.CheckCircle">
+            📅 Período de Nómina Destino: <b>@(_periodInfo?.Name ?? "Cargando...")</b> &nbsp;|&nbsp;
+            ℹ️ Estado: <b>@(_periodInfo?.Status ?? "...")</b>
+        </MudAlert>
+
+        <MudForm @ref="_form" Model="@_dto" IsValidChanged="(valid) => _isFormValid = valid">
+
+            @* 1️⃣ SELECCIÓN DEL EMPLEADO *@
+            <MudDivider Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">1️⃣ SELECCIÓN DEL EMPLEADO</MudText>
+
+            <MudAutocomplete T="EmployeeSearchDto" Label="🔍 Buscar empleado"
+                             SearchFunc="SearchEmployeesAsync"
+                             ValueChanged="OnEmployeeSelectedAsync"
+                             Value="_currentEmployee"
+                             ToStringFunc="EmployeeToString"
+                             Variant="Variant.Outlined" Class="mb-4"
+                             ResetValueOnEmptyText="true" Clearable="true"
+                             Required="true" RequiredError="Debe seleccionar un empleado." />
+
+            @if (_currentEmployee != null)
+            {
+                <MudPaper Class="pa-4 mb-6" Outlined="true" Style="background-color: #f8fafc;">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3" Color="Color.Dark">📊 RESUMEN ACTUAL (Solo lectura):</MudText>
+                    <MudGrid>
+                        <MudItem xs="12" md="3"><MudTextField T="decimal" Label="💰 Salario Base" Value="@_currentEmployee.BaseSalary" ReadOnly="true" Variant="Variant.Text" Adornment="Adornment.Start" AdornmentText="C$" /></MudItem>
+                        <MudItem xs="12" md="3"><MudTextField T="string" Label="💼 Puesto" Value="@_currentEmployee.JobGradeName" ReadOnly="true" Variant="Variant.Text" /></MudItem>
+                        <MudItem xs="12" md="3"><MudTextField T="string" Label="⏰ Turno" Value="@_currentEmployee.ShiftName" ReadOnly="true" Variant="Variant.Text" /></MudItem>
+                        <MudItem xs="12" md="3"><MudTextField T="string" Label="🏢 Centro Costo" Value="@_currentEmployee.CostCenterName" ReadOnly="true" Variant="Variant.Text" /></MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
+            @* 2️⃣ CONFIGURACIÓN DEL CAMBIO *@
+            <MudDivider Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">2️⃣ CONFIGURACIÓN DEL CAMBIO</MudText>
+
+            <MudGrid Class="mb-6">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" Label="Tipo de Acción" Value="@_dto.ActionType" ValueChanged="OnActionTypeChanged" Variant="Variant.Outlined" Required="true">
+                        <MudSelectItem Value="@("SalaryChange")">💰 Cambio de Salario</MudSelectItem>
+                        <MudSelectItem Value="@("PositionChange")">💼 Cambio de Puesto</MudSelectItem>
+                        <MudSelectItem Value="@("ContractChange")">📄 Cambio de Contrato</MudSelectItem>
+                        <MudSelectItem Value="@("ShiftChange")">⏰ Cambio de Turno</MudSelectItem>
+                        <MudSelectItem Value="@("CostCenterChange")">🏢 Cambio de Centro Costo</MudSelectItem>
+                        <MudSelectItem Value="@("HealthProviderChange")">🏥 Cambio de Proveedor de Salud</MudSelectItem>
+                        <MudSelectItem Value="@("BankAccountChange")">🏦 Cambio de Cuenta Bancaria</MudSelectItem>
+                        <MudSelectItem Value="@("Suspension")">⏸️ Suspensión</MudSelectItem>
+                        <MudSelectItem Value="@("Reinstatement")">🔄 Reincorporación</MudSelectItem>
+                        <MudSelectItem Value="@("Termination")">🛑 Terminación</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudDatePicker Label="Fecha de Efecto" @bind-Date="_effectiveDate" Variant="Variant.Outlined" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    @if (_hasCausalList)
+                    {
+                        <MudSelect T="string" @bind-Value="_dto.CausalDescription" Label="Causal Legal" Variant="Variant.Outlined" Required="true">
+                            @foreach (var c in _availableCausals)
+                            {
+                                <MudSelectItem Value="@c">@c</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField T="string" @bind-Value="_dto.CausalDescription" Label="Causal Legal" Variant="Variant.Outlined" Required="true" />
+                    }
+                </MudItem>
+            </MudGrid>
+
+            @* Campos dinámicos por tipo de acción *@
+            @if (_dto.ActionType == "SalaryChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal?" Value="@_dto.OldBaseSalary" Label="Salario Actual" Variant="Variant.Filled" ReadOnly="true" Adornment="Adornment.Start" AdornmentText="C$" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal?" Value="@_dto.NewBaseSalary" ValueChanged="ValidateSalaryRealTime" Label="Nuevo Salario" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentText="C$" Error="@_hasSalaryError" ErrorText="@_salaryErrorMessage" />
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "PositionChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.JobGradeName" Label="Puesto Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="JobGradeDto" Label="Nuevo Puesto" SearchFunc="SearchJobGrades"
+                                         ValueChanged="@((JobGradeDto v) => { _dto.NewJobGradeId = v?.Id; _dto.NewJobGradeName = v?.Name; ValidateIntegrity("Pos", v?.Id, _currentEmployee?.JobGradeId); })"
+                                         ToStringFunc="JobGradeToString" Clearable="true" />
+                        @if (_integrityErrors.Contains("Pos"))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">❌ Debe ser diferente al puesto actual.</MudText>
+                        }
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal?" Value="@_dto.NewBaseSalary" ValueChanged="ValidateSalaryRealTime" Label="Nuevo Salario (opcional)" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentText="C$" Error="@_hasSalaryError" ErrorText="@_salaryErrorMessage" />
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "ContractChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.ContractTypeName" Label="Contrato Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="ContractTypeDto" Label="Nuevo Tipo de Contrato" SearchFunc="SearchContractTypes"
+                                         ValueChanged="@((ContractTypeDto v) =>
+                                         {
+                                             _dto.NewContractTypeId = v?.Id;
+                                             if (v?.Id == _currentEmployee?.ContractTypeId)
+                                                 _integrityErrors.Add("Contract");
+                                             else
+                                                 _integrityErrors.Remove("Contract");
+                                         })"
+                                         ToStringFunc="ContractTypeToString" Clearable="true" />
+                        @if (_integrityErrors.Contains("Contract"))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">❌ Debe ser diferente al contrato actual.</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "ShiftChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.ShiftName" Label="Turno Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="ShiftDto" Label="Nuevo Turno" SearchFunc="SearchShifts"
+                                         ValueChanged="@((ShiftDto v) => { _dto.NewShiftId = v?.Id; ValidateIntegrity("Shift", v?.Id, _currentEmployee?.ShiftId); })"
+                                         ToStringFunc="ShiftToString" Clearable="true" />
+                        @if (_integrityErrors.Contains("Shift"))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">❌ Debe ser diferente al turno actual.</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "CostCenterChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.CostCenterName" Label="Centro Costo Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="CostCenterDto" Label="Nuevo Centro de Costo" SearchFunc="SearchCostCenters"
+                                         ValueChanged="@((CostCenterDto v) => { _dto.NewCostCenterId = v?.Id; ValidateIntegrity("CC", v?.Id, _currentEmployee?.CostCenterId); })"
+                                         ToStringFunc="CostCenterToString" Clearable="true" />
+                        @if (_integrityErrors.Contains("CC"))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">❌ Debe ser diferente al centro actual.</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "HealthProviderChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.HealthProviderName" Label="Proveedor Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="HealthProviderDto" Label="Nuevo Proveedor de Salud" SearchFunc="SearchHealthProviders"
+                                         ValueChanged="@((HealthProviderDto v) => { _dto.NewHealthProviderId = v?.Id; _dto.NewHealthProviderName = v?.Name; ValidateIntegrity("Health", v?.Id, _currentEmployee?.HealthProviderId); })"
+                                         ToStringFunc="HealthProviderToString" Clearable="true" />
+                        @if (_integrityErrors.Contains("Health"))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">❌ Debe ser diferente al proveedor actual.</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "BankAccountChange")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.BankName" Label="Banco Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Value="@_currentEmployee?.BankAccountNumber" Label="Cuenta Actual" ReadOnly="true" Variant="Variant.Filled" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int" @bind-Value="_selectedBankId" Label="Nuevo Banco" Variant="Variant.Outlined" Required="true">
+                            <MudSelectItem Value="0">-- Seleccione un banco --</MudSelectItem>
+                            @foreach (var bank in _banksList)
+                            {
+                                <MudSelectItem Value="bank.Id">@bank.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" @bind-Value="_dto.NewBankAccountNumber" Label="Nueva Cuenta Bancaria" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "Suspension")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @bind-Value="_dto.SuspensionType" Label="Tipo de Suspensión" Variant="Variant.Outlined" Required="true">
+                            <MudSelectItem Value="@("MedicalLeave")">🩺 Médica</MudSelectItem>
+                            <MudSelectItem Value="@("OccupationalRisk")">⚠️ Riesgo profesional</MudSelectItem>
+                            <MudSelectItem Value="@("LegalDisciplinary")">⚖️ Disciplinaria</MudSelectItem>
+                            <MudSelectItem Value="@("MutualConsent")">🤝 Mutuo acuerdo</MudSelectItem>
+                            <MudSelectItem Value="@("CivicDuty")">🗳️ Deber cívico</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker @bind-Date="_dto.SuspensionStartDate" Label="Fecha Inicio" Variant="Variant.Outlined" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker @bind-Date="_dto.SuspensionEndDate" Label="Fecha Fin (opcional)" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            }
+            else if (_dto.ActionType == "Reinstatement")
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Se reincorporará al empleado desde su suspensión activa.
+                </MudAlert>
+            }
+            else if (_dto.ActionType == "Termination")
+            {
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" @bind-Value="_dto.TerminationType" Label="Tipo de Terminación" Variant="Variant.Outlined" Required="true">
+                            <MudSelectItem Value="@("Resignation")">📄 Renuncia voluntaria</MudSelectItem>
+                            <MudSelectItem Value="@("UnfairDismissal")">⚖️ Despido injustificado</MudSelectItem>
+                            <MudSelectItem Value="@("JustifiedDismissal")">🔍 Despido justificado</MudSelectItem>
+                            <MudSelectItem Value="@("MutualAgreement")">🤝 Mutuo acuerdo</MudSelectItem>
+                            <MudSelectItem Value="@("Bankruptcy")">🏚️ Quiebra / Cierre</MudSelectItem>
+                            <MudSelectItem Value="@("Death")">⚰️ Fallecimiento</MudSelectItem>
+                            <MudSelectItem Value="@("Probation")">📆 Período de prueba</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch T="bool?" @bind-Checked="_dto.IsJustified" Label="¿Justificado?" Class="mt-4" />
+                    </MudItem>
+                </MudGrid>
+            }
+
+            @* 3️⃣ JUSTIFICACIÓN *@
+            <MudDivider Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">3️⃣ JUSTIFICACIÓN</MudText>
+
+            <MudTextField T="string" @bind-Value="_dto.Justification" Immediate="true"
+                          Label="📝 Justificación Obligatoria" Variant="Variant.Outlined" Lines="3"
+                          HelperText="@($"{_dto.Justification?.Length ?? 0} caracteres ingresados (Mín. 20)")"
+                          Required="true" RequiredError="La justificación es obligatoria." Class="mb-6" />
+
+            @* 4️⃣ SOPORTE DOCUMENTAL *@
+            <MudDivider Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Primary">4️⃣ SOPORTE DOCUMENTAL</MudText>
+
+            <MudPaper Class="pa-4 mb-6" Outlined="true">
+                <MudText Typo="Typo.body2" Class="mb-4">Documentos requeridos para <b>@(_dto.ActionType ?? "esta acción")</b>:</MudText>
+                @foreach (var doc in _requiredDocuments)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudIcon Icon="@(doc.IsUploaded ? Icons.Material.Filled.CheckBox : Icons.Material.Filled.CheckBoxOutlineBlank)"
+                                 Color="@(doc.IsMandatory && !doc.IsUploaded ? Color.Error : Color.Success)" />
+                        <MudText Typo="Typo.body2">@(doc.IsMandatory ? "☑️ *" : "☐") @doc.DocumentName</MudText>
+                        <MudSpacer />
+                        @if (doc.IsUploaded)
+                        {
+                            <MudText Typo="Typo.caption" Class="mr-2">📄 @doc.FileName</MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="() => RemoveDocument(doc)">🗑️</MudButton>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Class="ml-2"><b>✅ Cargado</b></MudText>
+                        }
+                        else
+                        {
+                            var inputId = $"fileInput_{doc.GetHashCode()}";
+                            <InputFile id="@inputId" style="display: none;"
+                                       OnChange="@(e => OnFileSelectedInternal(e, doc))"
+                                       accept=".pdf,.jpg,.jpeg,.png" />
+                            <label for="@inputId" class="mud-button-root mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small mud-ripple"
+                                   style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px;">
+                                + Adjuntar archivo
+                            </label>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+
+            @* RESUMEN Y ACCIONES *@
+            <MudDivider Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-4" Color="Color.Warning">⚠️ RESUMEN DE IMPACTO Y ACCIONES</MudText>
+
+            <MudAlert Severity="Severity.Warning" Class="mb-6" Outlined="true">
+                <MudText Typo="Typo.body2" Class="mb-2">Al guardar esta acción, se registrará el cambio para el empleado:</MudText>
+                @if (_currentEmployee != null)
+                {
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        👤 <b>@_currentEmployee.FullName (@_currentEmployee.Identification)</b> |
+                        @if (_dto.ActionType == "SalaryChange")
+                        {
+                            <span>💰 Salario: C$@(_dto.OldBaseSalary?.ToString("N2") ?? "0.00") ➔ C$@(_dto.NewBaseSalary?.ToString("N2") ?? "0.00")</span>
+                        }
+                        else if (_dto.ActionType == "PositionChange")
+                        {
+                            <span>💼 Puesto: @_currentEmployee.JobGradeName ➔ @(_dto.NewJobGradeName ?? "Nuevo")</span>
+                            if (_dto.NewBaseSalary.HasValue)
+                            {
+                                <span> | 💰 Salario: C$@(_dto.OldBaseSalary?.ToString("N2")) ➔ C$@(_dto.NewBaseSalary.Value.ToString("N2"))</span>
+                            }
+                        }
+                        else if (_dto.ActionType == "ContractChange")
+                        {
+                            <span>📄 Contrato: @_currentEmployee.ContractTypeName ➔ @(_dto.NewContractTypeName ?? "Nuevo")</span>
+                        }
+                        else if (_dto.ActionType == "ShiftChange")
+                        {
+                            <span>⏰ Turno: @_currentEmployee.ShiftName ➔ @(_dto.NewShiftName ?? "Nuevo")</span>
+                        }
+                        else if (_dto.ActionType == "CostCenterChange")
+                        {
+                            <span>🏢 Centro Costo: @_currentEmployee.CostCenterName ➔ @(_dto.NewCostCenterName ?? "Nuevo")</span>
+                        }
+                        else if (_dto.ActionType == "HealthProviderChange")
+                        {
+                            <span>🏥 Proveedor Salud: @_currentEmployee.HealthProviderName ➔ @(_dto.NewHealthProviderName ?? "Nuevo")</span>
+                        }
+                        else if (_dto.ActionType == "BankAccountChange")
+                        {
+                            <span>🏦 Cuenta: @_currentEmployee.BankAccountNumber ➔ @(_dto.NewBankAccountNumber ?? "Nueva")</span>
+                        }
+                        else if (_dto.ActionType == "Suspension")
+                        {
+                            <span>⏸️ Suspensión @(_dto.SuspensionType == "MedicalLeave" ? "Médica" : _dto.SuspensionType == "OccupationalRisk" ? "Riesgo profesional" : _dto.SuspensionType == "LegalDisciplinary" ? "Disciplinaria" : _dto.SuspensionType == "MutualConsent" ? "Mutuo acuerdo" : "Deber cívico") desde @(_dto.SuspensionStartDate?.ToString("dd/MM/yyyy")) hasta @(_dto.SuspensionEndDate?.ToString("dd/MM/yyyy") ?? "indefinido")</span>
+                        }
+                        else if (_dto.ActionType == "Reinstatement")
+                        {
+                            <span>🔄 Reincorporación desde suspensión activa</span>
+                        }
+                        else if (_dto.ActionType == "Termination")
+                        {
+                            <span>🛑 Terminación por @(_dto.TerminationType == "Resignation" ? "Renuncia" : _dto.TerminationType == "UnfairDismissal" ? "Despido injustificado" : _dto.TerminationType == "JustifiedDismissal" ? "Despido justificado" : _dto.TerminationType == "MutualAgreement" ? "Mutuo acuerdo" : _dto.TerminationType == "Bankruptcy" ? "Quiebra" : _dto.TerminationType == "Death" ? "Fallecimiento" : "Período de prueba") (@(_dto.IsJustified == true ? "Justificado" : "No justificado"))</span>
+                        }
+                        |
+                        📅 Efecto: @(_effectiveDate?.ToString("dd/MM/yyyy"))
+                    </MudText>
+                }
+                <MudText Typo="Typo.body2" Color="Color.Error">
+                    <b>🔒 NOTA:</b> Una vez que la acción pase a estado "Ejecutada", el registro será INMUTABLE.
+                </MudText>
+            </MudAlert>
+
+            <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="4">
+                <MudStack Spacing="0" AlignItems="AlignItems.Center">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Large"
+                               Disabled="@(!_isFormValid)" OnClick="() => SaveActionAsync(false)">
+                        💾 Guardar como Pendiente
+                    </MudButton>
+                    <MudText Typo="Typo.caption" Class="mt-1">(Requiere revisión posterior)</MudText>
+                </MudStack>
+                <MudStack Spacing="0" AlignItems="AlignItems.Center">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                               Disabled="@(!CanExecuteNow)" OnClick="() => SaveActionAsync(true)">
+                        ✅ Crear y Ejecutar Ahora
+                    </MudButton>
+                    <MudText Typo="Typo.caption" Class="mt-1">(Aplica el cambio a la BD ahora)</MudText>
+                </MudStack>
+            </MudStack>
+
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // ----- DTO EXTENDIDO -----
+    private class ExtendedActionDto : CreatePersonalActionDto
+    {
+        public string? NewJobGradeName { get; set; }
+        public string? NewContractTypeName { get; set; }
+        public string? NewShiftName { get; set; }
+        public string? NewCostCenterName { get; set; }
+        public Guid? NewHealthProviderId { get; set; }
+        public string? NewBankAccountNumber { get; set; }
+        public string? NewBankName { get; set; }
+        public string? NewHealthProviderName { get; set; } 
+        public string? SuspensionType { get; set; }
+        public DateTime? SuspensionStartDate { get; set; }
+        public DateTime? SuspensionEndDate { get; set; }
+        public string? TerminationType { get; set; }
+        public bool? IsJustified { get; set; }
+        public List<DocumentAttachmentDto> Documents { get; set; } = new();
+     
+        public int? NewBankId { get; set; }
+    }
+
+ 
+    
+
+    private ExtendedActionDto _dto = new() { ActionType = "SalaryChange" };
+    private MudForm? _form;
+    private bool _isFormValid;
+    private EmployeeSearchDto? _currentEmployee;
+    private DateTime? _effectiveDate = DateTime.Today;
+    private PeriodInfoDto? _periodInfo;
+
+    private bool _hasCausalList = false;
+    private List<string> _availableCausals = new();
+    private List<UIDocumentRequirement> _requiredDocuments = new();
+    private HashSet<string> _integrityErrors = new();
+
+    private bool _hasSalaryError = false;
+    private string _salaryErrorMessage = "";
+    private decimal _minWageForEmployee = 0;
+    private bool _isUploading = false;
+    private Dictionary<string, UIDocumentRequirement> _tempDocMapping = new();
+
+    private int _selectedBankId = 0; // 0 indica "ninguno seleccionado"
+    private List<BankDto> _banksList = new();
+
+    private bool CanExecuteNow =>
+        _isFormValid &&
+        !_hasSalaryError &&
+        (_dto.Justification?.Length ?? 0) >= 20 &&
+        _requiredDocuments.All(d => !d.IsMandatory || d.IsUploaded) &&
+        !_integrityErrors.Any();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try {
+            _periodInfo = await Http.GetFromJsonAsync<PeriodInfoDto>("api/payroll-periods/active"); 
+
+        
+        } catch { }
+        await LoadBanksAsync();
+        UpdateCausalsAndDocs();
+    }
+
+    private string EmployeeToString(EmployeeSearchDto? e) => e == null ? string.Empty : $"{e.FullName} ({e.Identification})";
+    private string JobGradeToString(JobGradeDto? j) => j?.Name ?? "";
+    private string ShiftToString(ShiftDto? s) => s?.Name ?? "";
+    private string CostCenterToString(CostCenterDto? c) => c?.Name ?? "";
+    private string ContractTypeToString(ContractTypeDto? ct) => ct?.Name ?? "";
+    private string HealthProviderToString(HealthProviderDto? hp) => hp?.Name ?? "";
+
+    private async Task LoadBanksAsync()
+    {
+        try
+        {
+            _banksList = await Http.GetFromJsonAsync<List<BankDto>>("api/banks/active") ?? new();
+        }
+        catch { _banksList = new(); }
+    }
+
+    private async Task<IEnumerable<EmployeeSearchDto>> SearchEmployeesAsync(string value, CancellationToken ct)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<EmployeeSearchDto>>("api/employees/active", ct);
+            if (result == null) return Enumerable.Empty<EmployeeSearchDto>();
+            if (string.IsNullOrWhiteSpace(value)) return result;
+            return result.Where(e => e.FullName.Contains(value, StringComparison.InvariantCultureIgnoreCase) ||
+                                     e.Identification.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<EmployeeSearchDto>(); }
+    }
+
+    private async Task OnEmployeeSelectedAsync(EmployeeSearchDto? emp)
+    {
+        _currentEmployee = emp;
+        if (emp != null)
+        {
+            _dto.EmployeeId = emp.Id;
+            _dto.OldBaseSalary = emp.BaseSalary;
+            _integrityErrors.Clear();
+
+            try
+            {
+                _minWageForEmployee = await Http.GetFromJsonAsync<decimal>($"api/employees/{emp.Id}/minimum-wage");
+            }
+            catch { _minWageForEmployee = 0; }
+        }
+    }
+
+    private async Task<IEnumerable<JobGradeDto>> SearchJobGrades(string value, CancellationToken ct)
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<JobGradeDto>>("api/jobgrades/active", ct);
+            if (all == null) return Enumerable.Empty<JobGradeDto>();
+            if (string.IsNullOrWhiteSpace(value)) return all;
+            return all.Where(j => j.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<JobGradeDto>(); }
+    }
+
+    private async Task<IEnumerable<ShiftDto>> SearchShifts(string value, CancellationToken ct)
+    {
+        try
+        {
+            var r = await Http.GetFromJsonAsync<List<ShiftDto>>($"api/shifts/active", ct);
+            return r ?? Enumerable.Empty<ShiftDto>();
+        }
+        catch { return Enumerable.Empty<ShiftDto>(); }
+    }
+
+    private async Task<IEnumerable<CostCenterDto>> SearchCostCenters(string value, CancellationToken ct)
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<CostCenterDto>>("api/costcenters/active", ct);
+            if (all == null) return Enumerable.Empty<CostCenterDto>();
+            if (string.IsNullOrWhiteSpace(value)) return all;
+            return all.Where(c => c.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<CostCenterDto>(); }
+    }
+
+    private async Task<IEnumerable<ContractTypeDto>> SearchContractTypes(string value, CancellationToken ct)
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<ContractTypeDto>>("api/contracttypes/all", ct);
+            if (all == null) return Enumerable.Empty<ContractTypeDto>();
+            if (string.IsNullOrWhiteSpace(value)) return all;
+            return all.Where(ct => ct.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<ContractTypeDto>(); }
+    }
+
+    private async Task<IEnumerable<HealthProviderDto>> SearchHealthProviders(string value, CancellationToken ct)
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<HealthProviderDto>>("api/healthproviders/active", ct);
+            if (all == null) return Enumerable.Empty<HealthProviderDto>();
+            if (string.IsNullOrWhiteSpace(value)) return all;
+            return all.Where(hp => hp.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<HealthProviderDto>(); }
+    }
+
+    private void ValidateIntegrity(string type, Guid? newValueId, Guid? currentValueId)
+    {
+        if (newValueId.HasValue && currentValueId.HasValue && newValueId.Value == currentValueId.Value)
+            _integrityErrors.Add(type);
+        else
+            _integrityErrors.Remove(type);
+    }
+
+    private void UpdateCausalsAndDocs()
+    {
+        _hasCausalList = _dto.ActionType is "SalaryChange" or "Suspension" or "Termination";
+        _availableCausals = _dto.ActionType switch
+        {
+            "SalaryChange" => new() { "Ascenso", "Ajuste IPC", "Corrección de nómina" },
+            "Termination" => new() { "Renuncia voluntaria", "Despido injustificado", "Despido justificado", "Mutuo acuerdo", "Quiebra", "Fallecimiento", "Período de prueba" },
+            "Suspension" => new() { "Enfermedad común", "Accidente laboral", "Sanción disciplinaria", "Mutuo consentimiento", "Deber cívico" },
+            _ => new()
+        };
+
+        _requiredDocuments = _dto.ActionType switch
+        {
+            "SalaryChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Carta de Aumento Salarial Firmada", IsMandatory = true },
+                new() { DocumentName = "Acta de Evaluación de Desempeño o Memorándum de Justificación", IsMandatory = true },
+                new() { DocumentName = "Tabla salarial del sector económico", IsMandatory = false },
+                new() { DocumentName = "Correo o acta de aprobación de Gerencia General", IsMandatory = false }
+            },
+            "PositionChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Acta de Nombramiento o Ascenso Firmada", IsMandatory = true },
+                new() { DocumentName = "Nueva Descripción de Puesto Firmada por el empleado", IsMandatory = true },
+                new() { DocumentName = "Certificados, títulos o licencias requeridas", IsMandatory = false },
+                new() { DocumentName = "Organigrama actualizado del área", IsMandatory = false }
+            },
+            "ContractChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Nuevo Contrato de Trabajo Firmado o Adenda", IsMandatory = true },
+                new() { DocumentName = "Carta de Aceptación de las Nuevas Condiciones", IsMandatory = true },
+                new() { DocumentName = "Copia de cédula de identidad actualizada", IsMandatory = false },
+                new() { DocumentName = "Dictamen legal interno", IsMandatory = false }
+            },
+            "ShiftChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Notificación de Cambio de Turno Firmada", IsMandatory = true },
+                new() { DocumentName = "Solicitud de cambio de turno (si voluntario)", IsMandatory = false },
+                new() { DocumentName = "Acta de acuerdo de modificación de jornada", IsMandatory = false }
+            },
+            "CostCenterChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Memorándum de Traslado firmado por RRHH y nuevo jefe", IsMandatory = true },
+                new() { DocumentName = "Solicitud de traslado voluntario", IsMandatory = false },
+                new() { DocumentName = "Acta de entrega/recepción de activos", IsMandatory = false }
+            },
+            "HealthProviderChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Formulario de Actualización de Datos Firmado", IsMandatory = true },
+                new() { DocumentName = "Póliza / Certificado / Carnet del nuevo proveedor", IsMandatory = true },
+                new() { DocumentName = "Carta de desvinculación del proveedor anterior", IsMandatory = false }
+            },
+            "BankAccountChange" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Constancia Bancaria o Copia de Libreta/Tarjeta", IsMandatory = true },
+                new() { DocumentName = "Formulario de Actualización de Datos Bancarios Firmado", IsMandatory = true },
+                new() { DocumentName = "Carta explicativa", IsMandatory = false }
+            },
+            "Suspension" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Documento que acredite la causal", IsMandatory = true },
+                new() { DocumentName = "Resolución MITRAB (solo suspensión colectiva)", IsMandatory = false }
+            },
+            "Reinstatement" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Acta de Reincorporación Firmada", IsMandatory = true },
+                new() { DocumentName = "Alta Médica o Certificado Médico", IsMandatory = true },
+                new() { DocumentName = "Resolución de levantamiento de medida disciplinaria", IsMandatory = false }
+            },
+            "Termination" => new List<UIDocumentRequirement>
+            {
+                new() { DocumentName = "Carta de Renuncia o Notificación de Despido", IsMandatory = true },
+                new() { DocumentName = "Acta de entrega de equipo / activos", IsMandatory = true },
+                new() { DocumentName = "Acta de finiquito (se genera después)", IsMandatory = false }
+            },
+            _ => new()
+        };
+    }
+
+    private void OnActionTypeChanged(string actionType)
+    {
+        _dto.ActionType = actionType;
+        // Limpiar valores específicos
+        _dto.NewBaseSalary = null;
+        _dto.NewJobGradeId = null;
+        _dto.NewJobGradeName = null;
+        _dto.NewContractTypeId = null;
+        _dto.NewContractTypeName = null;
+        _dto.NewShiftId = null;
+        _dto.NewShiftName = null;
+        _dto.NewCostCenterId = null;
+        _dto.NewCostCenterName = null;
+        _dto.NewHealthProviderId = null;
+        _dto.NewHealthProviderName = null;
+        _dto.NewBankAccountNumber = null;
+        _dto.NewBankName = null;
+        _dto.SuspensionType = null;
+        _dto.SuspensionStartDate = null;
+        _dto.SuspensionEndDate = null;
+        _dto.TerminationType = null;
+        _dto.IsJustified = null;
+        _hasSalaryError = false;
+        UpdateCausalsAndDocs();
+    }
+
+    private void ValidateSalaryRealTime(decimal? val)
+    {
+        _dto.NewBaseSalary = val;
+        if (_minWageForEmployee > 0)
+            _hasSalaryError = val.HasValue && val < _minWageForEmployee;
+        else
+            _hasSalaryError = false;
+        _salaryErrorMessage = _hasSalaryError ? $"Inferior al mínimo (C${_minWageForEmployee})" : "";
+    }
+
+    // Subida de documentos con MudFileUpload
+    private async Task OnFileSelectedInternal(InputFileChangeEventArgs e, UIDocumentRequirement doc)
+    {
+        var file = e.File; // ✅ Así se obtiene el archivo en InputFileChangeEventArgs
+        if (file == null) return;
+
+        if (_isUploading) return;
+        _isUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+            if (!new[] { ".pdf", ".jpg", ".jpeg", ".png" }.Contains(ext))
+            {
+                Snackbar.Add("Formato no permitido. Use PDF, JPG o PNG.", Severity.Warning);
+                return;
+            }
+            if (file.Size > 5 * 1024 * 1024)
+            {
+                Snackbar.Add("El archivo no puede superar los 5 MB.", Severity.Warning);
+                return;
+            }
+
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var streamContent = new StreamContent(stream);
+            content.Add(streamContent, "file", file.Name);
+
+            var response = await Http.PostAsync("api/documents/upload?folder=personal-actions", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<DocumentUploadResult>();
+                doc.IsUploaded = true;
+                doc.FileName = file.Name;
+                doc.FileUrl = result!.url;
+                _dto.Documents.Add(new DocumentAttachmentDto
+                {
+                    FileName = file.Name,
+                    FileUrl = result.url,
+                    ContentType = file.ContentType,
+                    UploadedAt = DateTime.UtcNow,
+                    IsRequired = doc.IsMandatory
+                });
+                Snackbar.Add($"Documento '{file.Name}' subido correctamente.", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error al subir: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveDocument(UIDocumentRequirement doc)
+    {
+        var urlToRemove = doc.FileUrl;  // ← guardar la URL antes de limpiar
+        doc.IsUploaded = false;
+        doc.FileName = "";
+        doc.FileUrl = "";
+        var item = _dto.Documents.FirstOrDefault(d => d.FileUrl == urlToRemove);
+        if (item != null) _dto.Documents.Remove(item);
+        StateHasChanged();
+    }
+
+    private async Task SaveActionAsync(bool executeImmediately)
+    {
+        if (_form != null) await _form.Validate();
+        if (!_isFormValid || (executeImmediately && !CanExecuteNow)) return;
+
+        _dto.EffectiveDate = _effectiveDate ?? DateTime.Today;
+        _dto.ExecuteImmediately = executeImmediately;
+
+        if (_dto.ActionType == "BankAccountChange")
+        {
+            _dto.NewBankId = _selectedBankId > 0 ? _selectedBankId : null;
+            // Si también necesitas enviar el nombre del banco (opcional):
+            var selectedBank = _banksList.FirstOrDefault(b => b.Id == _selectedBankId);
+            _dto.NewBankName = selectedBank?.Name;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/personalactions", _dto);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(executeImmediately ? "Acción ejecutada exitosamente." : "Acción guardada como pendiente.", Severity.Success);
+                Navigation.NavigateTo("/personal-actions");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                // Intentamos extraer mensajes comunes de validación
+                string errorMsg = errorContent;
+                try
+                {
+                    var jsonDoc = System.Text.Json.JsonDocument.Parse(errorContent);
+                    if (jsonDoc.RootElement.TryGetProperty("title", out var title))
+                        errorMsg = title.GetString();
+                    else if (jsonDoc.RootElement.TryGetProperty("detail", out var detail))
+                        errorMsg = detail.GetString();
+                    else if (jsonDoc.RootElement.TryGetProperty("message", out var message))
+                        errorMsg = message.GetString();
+                }
+                catch { /* Si no es JSON, mantenemos el texto original */ }
+                Snackbar.Add($"Error: {errorMsg}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error de conexión: {ex.Message}", Severity.Error);
+        }
+    }
+     
+    private async Task<IEnumerable<BankDto>> SearchBanksAsync(string value, CancellationToken ct)
+    {
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<BankDto>>("api/banks/active", ct);
+            if (all == null) return Enumerable.Empty<BankDto>();
+            if (string.IsNullOrWhiteSpace(value)) return all;
+            return all.Where(b => b.Name.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+        }
+        catch { return Enumerable.Empty<BankDto>(); }
+    }
+
+    private void Cancel() => Navigation.NavigateTo("/personal-actions");
+
+    // Clases auxiliares
+    private class DocumentUploadResult { public string url { get; set; } = ""; public string fileName { get; set; } = ""; public long size { get; set; } public string contentType { get; set; } = ""; }
+
+    public class EmployeeSearchDto
+    {
+        public Guid Id { get; set; }
+        public string Code { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string Identification { get; set; } = "";
+        public decimal BaseSalary { get; set; }
+        public string JobGradeName { get; set; } = "";
+        public Guid? JobGradeId { get; set; }
+        public string ShiftName { get; set; } = "";
+        public Guid? ShiftId { get; set; }
+        public string CostCenterName { get; set; } = "";
+        public Guid? CostCenterId { get; set; }
+        public int? ContractTypeId { get; set; }
+        public string ContractTypeName { get; set; } = "";
+        public Guid? HealthProviderId { get; set; }
+        public string HealthProviderName { get; set; } = "";
+        public string BankAccountNumber { get; set; } = "";
+        public string BankName { get; set; } = "";
+    }
+    public class JobGradeDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
+    public class ShiftDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
+    public class CostCenterDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
+    public class ContractTypeDto { public int Id { get; set; } public string Name { get; set; } = ""; }
+    public class HealthProviderDto { public Guid Id { get; set; } public string Name { get; set; } = ""; }
+    public class PeriodInfoDto { public string Name { get; set; } = ""; public string Status { get; set; } = ""; public bool IsOpen { get; set; } }
+    public class UIDocumentRequirement
+    {
+        public string DocumentName { get; set; } = "";
+        public bool IsMandatory { get; set; }
+        public bool IsUploaded { get; set; }
+        public string FileName { get; set; } = "";
+        public string FileUrl { get; set; } = "";
+    }
+
+    public class BankDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Code { get; set; } = "";
+    }
+}

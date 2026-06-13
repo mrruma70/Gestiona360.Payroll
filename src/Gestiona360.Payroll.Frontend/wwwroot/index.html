@@ -27,11 +27,13 @@
 
 <body>
     <div id="app">
-        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:Roboto, sans-serif;">
-            <div style="border: 6px solid #e0e0e0; border-top: 6px solid #594ae2; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
-            <span style="margin-top:20px; color:#616161;">Cargando módulos de nómina...</span>
+        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div style="border: 6px solid rgba(255,255,255,0.3); border-top: 6px solid #FFD700; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite;"></div>
+            <span style="margin-top:20px; color:white; font-size:18px; font-weight:300;">Cargando Gestiona 360...</span>
+            <span style="margin-top:8px; color:rgba(255,255,255,0.7); font-size:14px;">Sistema de Nómina</span>
         </div>
     </div>
+    
 
     <div id="blazor-error-ui">
         Ha ocurrido un error inesperado.
@@ -41,6 +43,10 @@
 
     <!-- 1. Librerías externas -->
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+    <!-- ✅ JsBarcode para códigos de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
 
     <!-- 2. TODAS tus funciones JavaScript personalizadas (SIN comentarios Razor) -->
     <script>
@@ -133,6 +139,41 @@
                     alert('Error al descargar el reporte: ' + error.message);
                 }
             }
+        };
+
+
+        window.generateBarcode = (elementId, payload) => {
+            try {
+                if (typeof JsBarcode === 'undefined') {
+                    console.error('❌ JsBarcode NO está cargado');
+                    return false;
+                }
+                const element = document.getElementById(elementId);
+                if (!element) {
+                    console.error(`❌ Elemento #${elementId} no encontrado`);
+                    return false;
+                }
+                JsBarcode(`#${elementId}`, payload, {
+                    format: 'CODE128',
+                    lineColor: '#000',
+                    width: 2,
+                    height: 80,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 10,
+                    background: '#ffffff'
+                });
+                console.log('✅ Código de barras generado:', payload);
+                return true;
+            } catch (err) {
+                console.error('❌ Error generando código de barras:', err);
+                return false;
+            }
+        };
+
+        window.logoutUser = function () {
+            localStorage.removeItem('authToken');
+            window.location.href = '/login';
         };
     </script>
 

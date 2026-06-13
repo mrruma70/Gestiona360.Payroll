@@ -1,161 +1,575 @@
 ﻿@page "/login"
+@attribute [AllowAnonymous]
 @layout LoginLayout
-@using FacturacionFacil.Client.Services
-@using Microsoft.AspNetCore.Components.Authorization
-@inject AuthService auth
-@inject NavigationManager nav
-@inject ISnackbar snack
+@using Microsoft.AspNetCore.Authorization
+@using Gestiona360.Payroll.Frontend.Auth
+@using Gestiona360.Payroll.Frontend.Services
+@inject NavigationManager Navigation
+@inject JwtAuthStateProvider AuthStateProvider
+@inject AuthService AuthService
+@inject ISnackbar Snackbar
 
-<PageTitle>Iniciar Sesión - Facturación Fácil</PageTitle>
-
-<style>
-    .login-container {
-        min-height: 100vh;
-        display: flex;
-    }
-
-    .brand-section {
-        background: linear-gradient(rgba(145, 18, 56, 0.85), rgba(145, 18, 56, 0.95)), url('images/bg-login.jpg');
-        background-size: cover;
-        background-position: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding: 60px;
-        color: white;
-    }
-
-    .form-section {
-        background-color: #f8f9fa;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 40px;
-    }
-
-    .login-card {
-        width: 100%;
-        max-width: 400px;
-    }
-</style>
+<PageTitle>Iniciar Sesión | Gestiona360 Payroll</PageTitle>
 
 <div class="login-container">
-    <MudGrid Spacing="0" Style="width: 100%; margin: 0;">
-        @* Lado Izquierdo: Branding (Inspirado en login.cshtml) *@
-        <MudItem xs="0" md="7" Class="brand-section d-none d-md-flex">
-            <MudImage Src="images/logologin.png" Width="180" Class="mb-6" />
-            <MudText Typo="Typo.h2" Style="font-weight: 800; line-height: 1.1;">
-                Facturación Fácil <br /> <span style="font-weight: 300; opacity: 0.8;">SAAS - ERP</span>
-            </MudText>
-            <MudDivider DividerType="DividerType.Middle" Class="my-6" Style="background-color: rgba(255,255,255,0.2); width: 100px; height: 3px;" />
-            <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 300;">
-                Movilidad y Control Total: Gestiona tu negocio <br /><b>estés donde estés.</b>
-            </MudText>
-            <MudText Typo="Typo.body1" Style="opacity: 0.7; max-width: 500px;">
-                Accede de forma segura a tus ventas, inventarios y reportes inteligentes desde cualquier dispositivo.
-            </MudText>
-        </MudItem>
+    <!-- PANEL IZQUIERDO: Branding Corporativo -->
+    <div class="brand-panel">
+        <div class="brand-content">
+            <div class="brand-logo">
+                <div class="logo-icon">
+                    <!-- ✅ IMAGEN DEL LOGO ACTUALIZADA -->
+                    <img src="/img/logopayroll.png" alt="Gestiona 360 Payroll Logo" />
+                </div>
+                <h1 class="brand-title">GESTIONA 360</h1>
+                <p class="brand-subtitle">Payroll System</p>
+            </div>
+@* 
+            <div class="brand-features">
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <div>
+                        <h3>Gestión Eficiente</h3>
+                        <p>Automatiza procesos de nómina en minutos</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <div>
+                        <h3>Seguridad Avanzada</h3>
+                        <p>Protección de datos con encriptación JWT</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <div>
+                        <h3>Reportes Inteligentes</h3>
+                        <p>Análisis en tiempo real de tu nómina</p>
+                    </div>
+                </div>
+            </div> *@
 
-        @* Lado Derecho: Formulario *@
-        <MudItem xs="12" md="5" Class="form-section">
-            <div class="login-card">
-                <div class="d-flex justify-center mb-6 d-md-none">
-                    <MudImage Src="images/logo.png" Width="100" />
+            <div class="brand-footer">
+                <p>© 2026 Gestiona360. Todos los derechos reservados.</p>
+                <p class="version">Versión 1.0.0</p>
+            </div>
+        </div>
+
+        <!-- Elementos decorativos -->
+        <div class="decorative-circle circle-1"></div>
+        <div class="decorative-circle circle-2"></div>
+        <div class="decorative-circle circle-3"></div>
+    </div>
+
+    <!-- PANEL DERECHO: Formulario -->
+    <div class="form-panel">
+        <div class="form-container">
+            <div class="form-header">
+                <h2>
+                    Bienvenido de nuevo
+                    <span class="wave-hand">👋</span>
+                </h2>
+                <p>Ingresa tus credenciales para acceder al sistema</p>
+            </div>
+
+            <MudForm @ref="_form" Validation="@(new Func<object, IEnumerable<string>>(ValidateLogin))">
+                <div class="form-fields">
+                    <MudTextField @bind-Value="_email"
+                                  Label="Correo Electrónico"
+                                  Placeholder="tu@empresa.com"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Immediate="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email"
+                                  Class="mb-4"
+                                  InputType="InputType.Email"
+                                  HelperText="Ingresa tu correo corporativo" />
+
+                    <MudTextField @bind-Value="_password"
+                                  Label="Contraseña"
+                                  Placeholder="••••••••"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Class="mb-2"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Lock"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  HelperText="Mínimo 6 caracteres"
+                                  Immediate="true">
+                        <AdornmentContent>
+                            <MudIconButton Icon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                           Size="Size.Small"
+                                           OnClick="@(() => _showPassword = !_showPassword)"
+                                           Title="@(_showPassword ? "Ocultar contraseña" : "Mostrar contraseña")" />
+                        </AdornmentContent>
+                    </MudTextField>
+
+                    @* <div class="form-options">
+                        <MudCheckBox T="bool" @bind-Value="_rememberMe" Label="Recordar sesión" Color="Color.Primary" />
+                        <MudLink Href="#" Color="Color.Primary" Typo="Typo.body2">¿Olvidaste tu contraseña?</MudLink>
+                    </div> *@
                 </div>
 
-                <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 700;">Bienvenidos</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-8">Ingresa tus credenciales para continuar</MudText>
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" 
+                              Dense="true" 
+                              Class="mb-4"
+                              Icon="@Icons.Material.Filled.ErrorOutline"
+                              Elevation="0">
+                        <MudText Typo="Typo.body2">@_errorMessage</MudText>
+                    </MudAlert>
+                }
 
-                <MudPaper Elevation="0" Class="pa-4" Style="background: transparent;">
-                    <MudTextField @bind-Value="tenantCode"
-                                  Label="Empresa / Tenant"
-                                  Variant="Variant.Outlined"
-                                  FullWidth="true"
-                                  Class="mb-4"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Domain" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="HandleLogin"
+                           Disabled="@_isLoading"
+                           Class="login-button"
+                           Style="text-transform: none; font-weight: 600; letter-spacing: 0.5px;">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Validando credenciales...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" Size="Size.Small" />
+                        <span>Iniciar Sesión</span>
+                    }
+                </MudButton>
+            </MudForm>
 
-                    <MudTextField @bind-Value="email"
-                                  Label="Correo Electrónico"
-                                  Variant="Variant.Outlined"
-                                  FullWidth="true"
-                                  Class="mb-4"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Email" />
-
-                    <MudTextField @bind-Value="password"
-                                  Label="Contraseña"
-                                  Variant="Variant.Outlined"
-                                  InputType="InputType.Password"
-                                  FullWidth="true"
-                                  Class="mb-6"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Lock" />
-
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               FullWidth="true"
-                               Size="Size.Large"
-                               Disabled="@loading"
-                               OnClick="DoLogin"
-                               Style="height: 55px; font-weight: 700; font-size: 1.1rem; border-radius: 8px;">
-                        @if (loading)
-                        {
-                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                            <MudText Class="ms-2">Procesando...</MudText>
-                        }
-                        else
-                        {
-                            <MudText>ENTRAR AL SISTEMA</MudText>
-                        }
-                    </MudButton>
-                </MudPaper>
-
-
-
-                <div class="mt-8 d-flex justify-center">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        &copy; 2026 Facturación Fácil - Todos los derechos reservados
+            <div class="form-footer">
+                <MudDivider Class="mb-4" />
+                <div class="support-info">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" Color="Color.Default" />
+                    <MudText Typo="Typo.caption" Color="Color.Default">
+                        ¿Necesitas ayuda? Contacta a 
+                        <MudLink Href="mailto:soporte@gestiona360.com" Color="Color.Primary">soporte@gestiona360.com</MudLink>
                     </MudText>
                 </div>
             </div>
-        </MudItem>
-    </MudGrid>
+        </div>
+    </div>
 </div>
 
-@code {
-    private string tenantCode, email, password;
-    private bool loading = false;
+<style>
+    /* ============================================
+       CONTENEDOR PRINCIPAL - SPLIT SCREEN
+       ============================================ */
+    .login-container {
+        display: flex;
+        min-height: 100vh;
+        background: #f5f5f7;
+        position: relative;
+        overflow: hidden;
+    }
 
-    private async Task DoLogin()
-    {
-        if (string.IsNullOrWhiteSpace(tenantCode) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-        {
-            snack.Add("Todos los campos son obligatorios", Severity.Warning);
-            return;
+    /* ============================================
+       PANEL IZQUIERDO - BRANDING
+       ============================================ */
+    .brand-panel {
+        flex: 1;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+        color: white;
+        padding: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .brand-content {
+        position: relative;
+        z-index: 2;
+        max-width: 500px;
+        width: 100%;
+    }
+
+    .brand-logo {
+        margin-bottom: 60px;
+        text-align: center;
+    }
+
+    /* ✅ CORRECCIÓN PARA IMAGEN PNG */
+    .logo-icon {
+        width: 120px; /* Tamaño ajustado para logo PNG */
+        height: 120px;
+        margin: 0 auto 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .logo-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain; /* Mantiene proporciones del logo */
+        filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4)); /* Sombra para resaltar sobre fondo oscuro */
+    }
+
+    .brand-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #FFD700;
+        margin: 0;
+        letter-spacing: 2px;
+    }
+
+    .brand-subtitle {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 8px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+    }
+
+    .brand-features {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 215, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .feature-item:hover {
+        background: rgba(255, 215, 0, 0.08);
+        transform: translateX(8px);
+        border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .feature-icon {
+        font-size: 28px;
+        flex-shrink: 0;
+    }
+
+    .feature-item h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+        color: #FFD700;
+    }
+
+    .feature-item p {
+        font-size: 13px;
+        margin: 0;
+        color: rgba(255, 255, 255, 0.7);
+        line-height: 1.5;
+    }
+
+    .brand-footer {
+        margin-top: 60px;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .brand-footer .version {
+        margin-top: 4px;
+        font-family: monospace;
+        color: rgba(255, 215, 0, 0.6);
+    }
+
+    /* Círculos decorativos */
+    .decorative-circle {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .circle-1 {
+        width: 400px;
+        height: 400px;
+        top: -100px;
+        right: -100px;
+        animation: pulse 8s ease-in-out infinite;
+    }
+
+    .circle-2 {
+        width: 300px;
+        height: 300px;
+        bottom: -50px;
+        left: -50px;
+        animation: pulse 10s ease-in-out infinite 2s;
+    }
+
+    .circle-3 {
+        width: 200px;
+        height: 200px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: pulse 6s ease-in-out infinite 1s;
+    }
+
+    /* ============================================
+       PANEL DERECHO - FORMULARIO
+       ============================================ */
+    .form-panel {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: white;
+    }
+
+    .form-container {
+        width: 100%;
+        max-width: 420px;
+    }
+
+    .form-header {
+        margin-bottom: 40px;
+        text-align: center;
+    }
+
+    .form-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 0 0 8px 0;
+    }
+
+    .form-header p {
+        font-size: 14px;
+        color: #666;
+        margin: 0;
+    }
+
+    .form-fields {
+        margin-bottom: 24px;
+    }
+
+    .form-options {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .login-button {
+        margin-top: 16px;
+        padding: 14px !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(26, 26, 26, 0.15);
+        transition: all 0.3s ease;
+    }
+
+    .login-button:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(26, 26, 26, 0.25);
+        transform: translateY(-2px);
+    }
+
+    .form-footer {
+        margin-top: 32px;
+        text-align: center;
+    }
+
+    .support-info {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* ============================================
+       ANIMACIONES
+       ============================================ */
+    @@keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 0.5; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    /* ============================================
+       RESPONSIVE - MÓVILES
+       ============================================ */
+    @@media (max-width: 960px) {
+        .login-container {
+            flex-direction: column;
         }
 
-        loading = true;
+        .brand-panel {
+            padding: 40px 20px;
+            min-height: auto;
+        }
+
+        .brand-features {
+            display: none;
+        }
+
+        .brand-logo {
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 80px; /* Más pequeño en móvil */
+            height: 80px;
+        }
+
+        .brand-title {
+            font-size: 24px;
+        }
+
+        .brand-footer {
+            margin-top: 20px;
+        }
+
+        .form-panel {
+            padding: 30px 20px;
+        }
+
+        .form-header h2 {
+            font-size: 22px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .form-options {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+
+    .wave-hand {
+        display: inline-block;
+        animation: wave-animation 1.8s ease-in-out infinite;
+        transform-origin: 70% 70%;
+    }
+
+    @@keyframes wave-animation {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        10% {
+            transform: rotate(14deg);
+        }
+
+        20% {
+            transform: rotate(-8deg);
+        }
+
+        30% {
+            transform: rotate(14deg);
+        }
+
+        40% {
+            transform: rotate(-4deg);
+        }
+
+        50% {
+            transform: rotate(10deg);
+        }
+
+        60% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(0deg);
+        }
+    }
+</style>
+
+@code {
+    private MudForm? _form;
+    private string _email = "admin@localhost";
+    private string _password = "Admin123!";
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+    private bool _rememberMe = false;
+    private string? _errorMessage;
+
+    // Validación en tiempo real
+    private IEnumerable<string> ValidateLogin(object arg)
+    {
+        var errors = new List<string>();
+        
+        if (string.IsNullOrWhiteSpace(_email))
+            errors.Add("El correo electrónico es obligatorio");
+        else if (!_email.Contains("@"))
+            errors.Add("Ingresa un correo electrónico válido");
+            
+        if (string.IsNullOrWhiteSpace(_password))
+            errors.Add("La contraseña es obligatoria");
+        else if (_password.Length < 6)
+            errors.Add("La contraseña debe tener al menos 6 caracteres");
+            
+        return errors;
+    }
+
+    private async Task HandleLogin()
+    {
+        _errorMessage = null;
+
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
         try
         {
-            var result = await auth.Login(tenantCode, email, password);
-            if (result.Success)
+            Console.WriteLine($"🔍 [Login] Intentando login con: {_email}");
+
+            var result = await AuthService.Login(_email, _password);
+
+            Console.WriteLine($"🔍 [Login] Success: {result.Success}");
+            Console.WriteLine($"🔍 [Login] Token length: {result.Token?.Length ?? 0}");
+
+            if (result.Success && !string.IsNullOrEmpty(result.Token))
             {
-                nav.NavigateTo("/", true);
+                Console.WriteLine($"✅ [Login] Guardando token...");
+
+                await AuthStateProvider.SetTokenAsync(result.Token);
+
+                Console.WriteLine($"✅ [Login] Token guardado. Redirigiendo a /");
+
+                Snackbar.Add($"✅ Bienvenido {result.User.FullName}", Severity.Success);
+
+                Navigation.NavigateTo("/", forceLoad: false);
             }
             else
             {
-                snack.Add(result.Error, Severity.Error);
+                _errorMessage = result.Message;
+                Snackbar.Add($"❌ {result.Message}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            snack.Add("Error inesperado: " + ex.Message, Severity.Error);
+            _errorMessage = "No se pudo conectar con el servidor. Intenta nuevamente.";
+            Console.WriteLine($"❌ [Login] Excepción: {ex.Message}");
+            Snackbar.Add($"❌ {ex.Message}", Severity.Error);
         }
         finally
         {
-            loading = false;
+            _isLoading = false;
+            StateHasChanged();
         }
     }
 }

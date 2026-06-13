@@ -1,0 +1,612 @@
+﻿@using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-center align-center" style="height: 300px;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_detail == null)
+{
+    <MudAlert Severity="Severity.Error" Class="ma-4">
+        No se pudo cargar el detalle de la acción.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4" Style="height: 100%; overflow-y: auto;">
+
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* ENCABEZADO: ESTADO Y FECHAS *@
+        @* ═══════════════════════════════════════════════════════════════ *@
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4">
+            @{
+                var (statusColor, statusIcon) = GetStatusColorAndIcon(_detail.Status);
+            }
+            <MudChip T="string" Color="@statusColor" Icon="@statusIcon" Size="Size.Large">
+                @TranslateStatus(_detail.Status)
+            </MudChip>
+            <MudText Typo="Typo.h6">@GetActionTypeName(_detail.ActionType)</MudText>
+        </MudStack>
+
+        <MudDivider Class="mb-4" />
+
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* INFORMACIÓN BÁSICA *@
+        @* ═══════════════════════════════════════════════════════════════ *@
+        <MudText Typo="Typo.subtitle2" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+            Información General
+        </MudText>
+
+        <MudSimpleTable Dense="true" Hover="true" Class="mb-4">
+            <tbody>
+                <tr>
+                    <td style="width: 40%;"><strong>Empleado:</strong></td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(_detail.BatchReference))
+                        {
+                            <MudText>🏭 Lote: @_detail.BatchReference</MudText>
+                            <MudText Typo="Typo.caption">(@_detail.AffectedCount empleados)</MudText>
+                        }
+                        else
+                        {
+                            <MudText>@_detail.EmployeeName</MudText>
+                            <MudText Typo="Typo.caption">@_detail.EmployeeCode</MudText>
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Fecha de Efecto:</strong></td>
+                    <td>@_detail.EffectiveDate.ToString("dd/MM/yyyy")</td>
+                </tr>
+                <tr>
+                    <td><strong>Causal Legal:</strong></td>
+                    <td>@(_detail.CausalDescription ?? "No especificada")</td>
+                </tr>
+                <tr>
+                    <td><strong>Período de Nómina:</strong></td>
+                    <td>@_detail.PayrollPeriodName</td>
+                </tr>
+                <tr>
+                    <td><strong>Grupo de Nómina:</strong></td>
+                    <td>@_detail.PayrollGroupName</td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <MudDivider Class="mb-4" />
+
+        @* ═══════════════════════════════════════════════════════════════ *@
+        @* COMPARATIVA ANTES / DESPUÉS *@
+        @* ═══════════════════════════════════════════════════════════════ *@
+        <MudText Typo="Typo.subtitle2" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.CompareArrows" Size="Size.Small" Class="mr-1" />
+            Comparativa de Cambios
+        </MudText>
+
+        <MudPaper Outlined="true" Class="pa-3 mb-4">
+            @if (_detail.ActionType == "SalaryChange")
+            {
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Salario Anterior</MudText>
+                        <MudText Typo="Typo.h6" Style="text-decoration: line-through; color: #888;">
+                            C$ @_detail.OldBaseSalary?.ToString("N2")
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Salario Nuevo</MudText>
+                        <MudText Typo="Typo.h6" Style="color: green; font-weight: bold;">
+                            C$ @_detail.NewBaseSalary?.ToString("N2")
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+                @if (_detail.OldBaseSalary.HasValue && _detail.NewBaseSalary.HasValue)
+                {
+                    var diff = _detail.NewBaseSalary.Value - _detail.OldBaseSalary.Value;
+                    var pct = _detail.OldBaseSalary.Value > 0 ? (diff / _detail.OldBaseSalary.Value * 100) : 0;
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        Variación: <strong style="color: @(diff >= 0 ? "green" : "red");">
+                        @(diff >= 0 ? "+" : "")C$ @diff.ToString("N2") (@pct.ToString("+0.0;-0.0")%)
+                    </strong>
+                </MudText>
+            }
+        }
+            else if (_detail.ActionType == "PositionChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Puesto Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldJobGradeName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Puesto Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewJobGradeName ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "ContractChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Contrato Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldContractTypeName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Contrato Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewContractTypeName ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "ShiftChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Turno Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldShiftName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Turno Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewShiftName ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "CostCenterChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Centro de Costo Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldCostCenterName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Centro de Costo Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewCostCenterName ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "HealthProviderChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Proveedor de Salud Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldHealthProviderName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Proveedor de Salud Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewHealthProviderName ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "BankAccountChange")
+        {
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Banco Anterior</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.OldBankName ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Banco Nuevo</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold;">
+                        @(_detail.NewBankName ?? "N/A")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Cuenta Anterior</MudText>
+                    <MudText Typo="Typo.body1" Style="font-family: 'monospace';">
+                        @(_detail.OldBankAccountNumber ?? "N/A")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Cuenta Nueva</MudText>
+                    <MudText Typo="Typo.body1" Style="color: green; font-weight: bold; font-family: 'monospace';">
+                        @(_detail.NewBankAccountNumber ?? "N/A")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        }
+        else if (_detail.ActionType == "Suspension" || _detail.ActionType == "MassSuspension")
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Tipo de Suspensión</MudText>
+                    <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                        @GetSuspensionTypeName(_detail.SuspensionType)
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Causal Legal</MudText>
+                    <MudText Typo="Typo.body1">@(_detail.CausalDescription ?? "No especificada")</MudText>
+                </MudItem>
+            </MudGrid>
+
+            @if (_detail.SuspensionStartDate.HasValue)
+            {
+                <MudGrid Class="mt-3">
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Fecha de Inicio</MudText>
+                        <MudText Typo="Typo.body1">@_detail.SuspensionStartDate.Value.ToString("dd/MM/yyyy")</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Fecha de Fin</MudText>
+                        <MudText Typo="Typo.body1">
+                            @if (_detail.SuspensionEndDate.HasValue)
+                            {
+                                @_detail.SuspensionEndDate.Value.ToString("dd/MM/yyyy")
+                            }
+                            else
+                            {
+                                <span style="color: orange;">Indefinida</span>
+                            }
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+            }
+        }
+        else if (_detail.ActionType == "Termination" || _detail.ActionType == "MassTermination")
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">
+                <MudText Typo="Typo.body2">
+                    <strong>🚪 Terminación:</strong> @_detail.CausalDescription
+                </MudText>
+                @if (_detail.TerminationTypeName != null)
+                {
+                    <MudText Typo="Typo.caption">Tipo: @_detail.TerminationTypeName</MudText>
+                }
+                @if (_detail.IndemnityAmount.HasValue && _detail.IndemnityAmount.Value > 0)
+                {
+                    <MudText Typo="Typo.caption">Indemnización: C$ @_detail.IndemnityAmount.Value.ToString("N2")</MudText>
+                }
+            </MudAlert>
+        }
+        else if (_detail.ActionType == "Reinstatement")
+        {
+            <MudAlert Severity="Severity.Success" Dense="true">
+                <MudText Typo="Typo.body2">
+                    <strong>▶️ Reincorporación:</strong> El empleado vuelve al estado activo.
+                </MudText>
+            </MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No hay información de comparativa disponible para este tipo de acción.
+            </MudText>
+        }
+    </MudPaper>
+
+    <MudDivider Class="mb-4" />
+
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* JUSTIFICACIÓN *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    <MudText Typo="Typo.subtitle2" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" Class="mr-1" />
+        Justificación
+    </MudText>
+    <MudPaper Outlined="true" Class="pa-3 mb-4">
+        <MudText Typo="Typo.body2">@_detail.Justification</MudText>
+    </MudPaper>
+
+    <MudDivider Class="mb-4" />
+
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* DOCUMENTOS ADJUNTOS *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @if (_detail.DocumentAttachments != null && _detail.DocumentAttachments.Any())
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Class="mr-1" />
+            Documentos Adjuntos (@_detail.DocumentAttachments.Count)
+        </MudText>
+
+        <MudList T="string" Dense="true" Class="mb-4">
+            @foreach (var doc in _detail.DocumentAttachments)
+            {
+                <MudListItem Icon="@Icons.Material.Filled.InsertDriveFile">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body2">@doc.FileName</MudText>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="@(() => DownloadFileAsync(doc.FileUrl, doc.FileName))">
+                            Descargar
+                        </MudButton>
+                    </MudStack>
+                </MudListItem>
+            }
+        </MudList>
+
+        <MudDivider Class="mb-4" />
+    }
+
+    
+
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* LÓGICA MASIVA: LISTA DE EMPLEADOS AFECTADOS *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @if (!string.IsNullOrEmpty(_detail.BatchReference) && _detail.AffectedEmployees != null && _detail.AffectedEmployees.Any())
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Class="mr-1" />
+            Empleados Afectados en este Lote
+        </MudText>
+
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="@($"Ver lista de empleados ({_detail.AffectedEmployees.Count})")">
+                <MudTable Items="@_detail.AffectedEmployees" Dense="true" Hover="true" Striped="true"
+                          RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh>Código</MudTh>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Cédula</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Código">@context.Code</MudTd>
+                        <MudTd DataLabel="Nombre">@context.FullName</MudTd>
+                        <MudTd DataLabel="Cédula">@context.Identification</MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudDivider Class="mb-4 mt-4" />
+    }
+
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* HISTORIAL DE AUDITORÍA *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    <MudText Typo="Typo.subtitle2" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Class="mr-1" />
+        Historial de Auditoría
+    </MudText>
+
+    <MudSimpleTable Dense="true" Hover="true">
+        <tbody>
+            <tr>
+                <td style="width: 40%;"><strong>Creado por:</strong></td>
+                <td>@_detail.CreatedByName</td>
+            </tr>
+            <tr>
+                <td><strong>Fecha de Creación:</strong></td>
+                <td>@_detail.CreatedDate.ToString("dd/MM/yyyy HH:mm")</td>
+            </tr>
+            @if (_detail.ApprovedDate.HasValue)
+            {
+                <tr>
+                    <td><strong>Aprobado por:</strong></td>
+                    <td>@(_detail.ApprovedByName ?? "N/A")</td>
+                </tr>
+                <tr>
+                    <td><strong>Fecha de Aprobación:</strong></td>
+                    <td>@_detail.ApprovedDate.Value.ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+            }
+            @if (_detail.ExecutedDate.HasValue)
+            {
+                <tr>
+                    <td><strong>Ejecutado por:</strong></td>
+                    <td>@(_detail.ExecutedByName ?? "N/A")</td>
+                </tr>
+                <tr>
+                    <td><strong>Fecha de Ejecución:</strong></td>
+                    <td>@_detail.ExecutedDate.Value.ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+            }
+            @if (_detail.IsAppliedInPayroll)
+            {
+                <tr>
+                    <td><strong>Procesado en Nómina:</strong></td>
+                    <td>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                            ✅ @_detail.AppliedInPayrollDate?.ToString("dd/MM/yyyy HH:mm")
+                        </MudChip>
+                    </td>
+                </tr>
+            }
+            @if (_detail.Status == "Rejected" && !string.IsNullOrEmpty(_detail.RejectionReason))
+            {
+                <tr>
+                    <td><strong>Motivo de Rechazo:</strong></td>
+                    <td>
+                        <MudText Color="Color.Error">@_detail.RejectionReason</MudText>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+
+    @* ═══════════════════════════════════════════════════════════════ *@
+    @* BOTÓN CERRAR *@
+    @* ═══════════════════════════════════════════════════════════════ *@
+    <MudButton Variant="Variant.Filled" Color="Color.Default" FullWidth="true"
+               StartIcon="@Icons.Material.Filled.Close" OnClick="@(() => OnClose.InvokeAsync())"
+               Class="mt-4">
+        Cerrar
+    </MudButton>
+</MudPaper>
+}
+
+@code {
+    [Parameter] public Guid ActionId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private PersonalActionDetailDto? _detail;
+    private bool _isLoading = true;
+
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTODO HELPER: Construir URL completa para descarga
+    // ═══════════════════════════════════════════════════════════════
+    private string GetDownloadUrl(string? fileUrl)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl))
+            return "#";
+
+        // Convertir: /uploads/personal-actions/abc.pdf
+        // A: /api/documents/download/personal-actions/abc.pdf
+        if (fileUrl.StartsWith("/uploads/"))
+        {
+            var path = fileUrl.Replace("/uploads/", "");
+            return $"/api/documents/download/{path}";
+        }
+
+        return fileUrl;
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ActionId != Guid.Empty)
+        {
+            await LoadDetail();
+        }
+    }
+
+    private async Task LoadDetail()
+    {
+        _isLoading = true;
+        _detail = null;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetAsync($"api/personalactions/{ActionId}");
+            if (response.IsSuccessStatusCode)
+            {
+                _detail = await response.Content.ReadFromJsonAsync<PersonalActionDetailDto>();
+            }
+            else
+            {
+                Snackbar.Add($"Error al cargar el detalle: {response.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private (Color color, string icon) GetStatusColorAndIcon(string status) => status switch
+    {
+        "Pending" => (Color.Warning, Icons.Material.Filled.Schedule),
+        "Approved" => (Color.Info, Icons.Material.Filled.ThumbUp),
+        "Executed" => (Color.Success, Icons.Material.Filled.CheckCircle),
+        "Rejected" => (Color.Error, Icons.Material.Filled.Cancel),
+        _ => (Color.Default, Icons.Material.Filled.Help)
+    };
+
+    private string TranslateStatus(string status) => status switch
+    {
+        "Pending" => "Pendiente",
+        "Approved" => "Aprobado",
+        "Executed" => "Ejecutado",
+        "Rejected" => "Rechazado",
+        _ => status
+    };
+
+    private string GetActionTypeName(string type) => type switch
+    {
+        "SalaryChange" => "💰 Cambio de Salario",
+        "PositionChange" => "🔄 Cambio de Puesto",
+        "ContractChange" => "📄 Cambio de Contrato",
+        "ShiftChange" => "⏰ Cambio de Turno",
+        "CostCenterChange" => "🏢 Cambio de Centro de Costo",
+        "HealthProviderChange" => "🏥 Cambio de Proveedor de Salud",
+        "BankAccountChange" => "🏦 Cambio de Cuenta Bancaria",
+        "Suspension" => "⏸️ Suspensión",
+        "MassSuspension" => "🏭 Suspensión Colectiva",
+        "Reinstatement" => "▶️ Reincorporación",
+        "Termination" => "🚪 Terminación",
+        "MassTermination" => "🏚️ Terminación Masiva",
+        _ => type
+    };
+
+    private string GetSuspensionTypeName(string? type) => type switch
+    {
+        "MedicalLeave" => "🩺 Médica",
+        "OccupationalRisk" => "⚠️ Riesgo Ocupacional",
+        "LegalDisciplinary" => "⚖️ Disciplinaria",
+        "MutualConsent" => "🤝 Mutuo Acuerdo",
+        "CivicDuty" => "🗳️ Deber Cívico",
+        _ => type ?? "N/A"
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // DESCARGA DE ARCHIVOS VIA HTTPCLIENT (FUNCIONA SIEMPRE)
+    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // DESCARGA DE ARCHIVOS VIA HTTPCLIENT
+    // ═══════════════════════════════════════════════════════════════
+    private async Task DownloadFileAsync(string? fileUrl, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl))
+        {
+            Snackbar.Add("URL del archivo no válida.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            // Convertir /uploads/personal-actions/xxx.pdf a api/documents/download/personal-actions/xxx.pdf
+            var downloadPath = fileUrl.StartsWith("/uploads/")
+                ? $"api/documents/download/{fileUrl.Replace("/uploads/", "")}"
+                : fileUrl;
+
+            // Descargar el archivo usando HttpClient (que YA apunta a la API)
+            var response = await Http.GetAsync(downloadPath);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Error al descargar: {response.StatusCode}", Severity.Error);
+                return;
+            }
+
+            // Obtener el contenido como bytes
+            var fileBytes = await response.Content.ReadAsByteArrayAsync();
+
+            // Convertir a base64
+            var base64 = Convert.ToBase64String(fileBytes);
+
+            // Determinar el content type
+            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+            var contentType = extension switch
+            {
+                ".pdf" => "application/pdf",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                _ => "application/octet-stream"
+            };
+
+            // Llamar a la función JavaScript que YA tienes definida
+            await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", base64, contentType, fileName);
+
+            Snackbar.Add($"Descargando '{fileName}'...", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+}

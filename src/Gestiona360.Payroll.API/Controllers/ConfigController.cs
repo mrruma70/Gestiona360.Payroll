@@ -1,6 +1,7 @@
 ﻿using Gestiona360.Payroll.Application.Contracts.DTOs;
 using Gestiona360.Payroll.Application.Features.Config.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    //[Authorize]
     public class ConfigController : ControllerBase
     {
         private readonly IMediator _mediator;

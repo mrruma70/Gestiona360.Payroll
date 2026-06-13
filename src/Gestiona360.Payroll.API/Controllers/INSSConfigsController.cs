@@ -9,7 +9,7 @@ namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
+    //[Authorize]
     public class INSSConfigsController : ControllerBase
     {
         private readonly IMediator _mediator;

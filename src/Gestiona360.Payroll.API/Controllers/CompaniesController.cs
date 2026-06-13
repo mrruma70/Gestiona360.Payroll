@@ -2,12 +2,14 @@
 using Gestiona360.Payroll.Application.Features.Companies.Commands;
 using Gestiona360.Payroll.Application.Features.Companies.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Gestiona360.Payroll.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class CompaniesController : ControllerBase
     {
         private readonly IMediator _mediator;
