@@ -95,7 +95,7 @@ namespace Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions
         // ═══════════════════════════════════════════════════════════════
 
         /// <summary>Lista de URLs de documentos adjuntos (subidos previamente)</summary>
-        public List<DocumentAttachmentDto> Documents { get; set; } = new();
+        public List<Domain.Shared.Frontend.DocumentAttachmentDto> Documents { get; set; } = new();
 
         // ═══════════════════════════════════════════════════════════════
         // CONTROL DE FLUJO

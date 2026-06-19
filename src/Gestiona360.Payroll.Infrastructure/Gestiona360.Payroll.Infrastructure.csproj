@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="DependencyInjection.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="SqlQueries\BRANCHES_LIST.sql" />
     <None Remove="SqlQueries\COMPANY_LEGAL_SHEET.sql" />
     <None Remove="SqlQueries\DgiIrRetentionMonthly.sql" />

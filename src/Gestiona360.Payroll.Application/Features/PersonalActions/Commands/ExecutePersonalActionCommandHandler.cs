@@ -1,38 +1,34 @@
-﻿using Gestiona360.Payroll.Application.Features.PersonalActions.Strategies;
-using Gestiona360.Payroll.Domain.Shared.Frontend.Enums;
-using Gestiona360.Payroll.Infrastructure.Persistence;
+﻿using Gestiona360.Payroll.Application.Abstractions.Repositories;
+using Gestiona360.Payroll.Domain.Interfaces;
+using Gestiona360.Payroll.Domain.Services;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands.ExecutePersonalAction;
 
 public class ExecutePersonalActionCommandHandler : IRequestHandler<ExecutePersonalActionCommand, Unit>
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly PersonalActionDomainService _domainService;
     private readonly IEnumerable<IPersonalActionStrategy> _strategies;
 
-    public ExecutePersonalActionCommandHandler(ApplicationDbContext context, IEnumerable<IPersonalActionStrategy> strategies)
+    public ExecutePersonalActionCommandHandler(
+        IUnitOfWork unitOfWork,
+        PersonalActionDomainService domainService,
+        IEnumerable<IPersonalActionStrategy> strategies)
     {
-        _context = context;
-        _strategies = strategies;
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _domainService = domainService ?? throw new ArgumentNullException(nameof(domainService));
+        _strategies = strategies ?? throw new ArgumentNullException(nameof(strategies));
     }
 
     public async Task<Unit> Handle(ExecutePersonalActionCommand request, CancellationToken ct)
     {
-        var action = await _context.PersonalActions
-            .Include(a => a.Employee)
-            .FirstOrDefaultAsync(a => a.Id == request.ActionId, ct);
+        // Ejecutar acción (validaciones, estrategia y actualización encapsuladas)
+        await _domainService.ExecuteActionAsync(request.ActionId, _strategies, ct);
 
-        // 1. Elegir la estrategia sin switch
-        var strategy = _strategies.FirstOrDefault(s => s.ActionType == action.ActionType)
-            ?? throw new NotSupportedException($"No hay estrategia para {action.ActionType}");
+        // Persistir (UnitOfWorkBehavior maneja la transacción automáticamente)
+        await _unitOfWork.SaveChangesAsync(ct);
 
-        // 2. Ejecutar
-        await strategy.ExecuteAsync(action, action.Employee, ct);
-
-        action.Status = ActionStatus.Executed;
-        await _context.SaveChangesAsync(ct);
         return Unit.Value;
     }
-
 }

@@ -1,9 +1,11 @@
 ﻿using FluentValidation;
 using Gestiona360.Payroll.Application.Contracts.Reports;
 using Gestiona360.Payroll.Application.Contracts.Services;
-using Gestiona360.Payroll.Application.Features.Employees.Exports;
-using Gestiona360.Payroll.Application.Features.PersonalActions.Strategies;
+using Gestiona360.Payroll.Application.Pipeline;
 using Gestiona360.Payroll.Application.Services;
+using Gestiona360.Payroll.Domain.Interfaces;
+using Gestiona360.Payroll.Domain.Services;
+using Gestiona360.Payroll.Infrastructure.Persistence.Repositories;
 using Gestiona360.Payroll.Infrastructure.Reporting;
 using Gestiona360.Payroll.Infrastructure.Reporting.Renderers;
 using MediatR;
@@ -21,6 +23,7 @@ namespace Gestiona360.Payroll.Application
 
             // Pipeline behavior de validación
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
 
 
             // Registro automático de todas las estrategias de acciones
@@ -44,11 +47,26 @@ namespace Gestiona360.Payroll.Application
             services.AddScoped<IReportRenderer, PdfReportRenderer>();
             services.AddScoped<IReportRenderer, XmlReportRenderer>();
             services.AddScoped<IReportRenderer, PdfFichaRenderer>();
-            services.AddScoped<EmployeeExportService>();
+            services.AddScoped<IExcelGenerator, ClosedXmlExcelGenerator>();
+            services.AddScoped<IEmployeeExportService, EmployeeExportService>();
+         
 
             services.AddScoped<IPayrollService, PayrollPeriodService>();
-
+            //services.AddScoped<IPersonalActionRepository, PersonalActionRepository>();
+            services.AddScoped<IPayrollRepository, PayrollRepository>();
             services.AddScoped<EmployeeBarcodeService>();
+        
+            services.AddScoped<ITaxScheduleRepository, TaxScheduleRepository>();
+            services.AddScoped<ICsvImportService, CsvImportService>();
+            services.AddScoped<IMinimumWageScheduleRepository, MinimumWageScheduleRepository>();
+            services.AddScoped<IInatecConfigRepository, InatecConfigRepository>();
+            services.AddScoped<IInssConfigRepository, InssConfigRepository>();
+            services.AddScoped<IPayrollGroupRepository, PayrollGroupRepository>();
+            services.AddScoped<IPersonalActionRepository, PersonalActionRepository>();
+            services.AddScoped<IPayrollPeriodRepository, PayrollPeriodRepository>();
+            services.AddScoped<IEmployeeShiftAssignmentRepository, EmployeeShiftAssignmentRepository>();
+            services.AddScoped<IPersonalActionValidationService, PersonalActionValidationService>();
+            services.AddScoped<IMinimumWageRepository, MinimumWageRepository>();
 
 
             // Escanea todos los validadores (AbstractValidator<T>) en este assembly

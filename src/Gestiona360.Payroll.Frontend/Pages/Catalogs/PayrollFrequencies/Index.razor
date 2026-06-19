@@ -1,12 +1,10 @@
 ﻿@page "/catalogo/payroll-frequencies"
 @attribute [Authorize]
-@using System.Net.Http.Json
 @using System.Linq
-@using MudBlazor
-@using Gestiona360.Payroll.API.Contracts.Common
+@using System.Net.Http.Json
 @using Gestiona360.Payroll.Application.Contracts.DTOs
 @using Gestiona360.Payroll.Application.Contracts.Requests
-@using Gestiona360.Payroll.Domain.Shared
+@using MudBlazor
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject NavigationManager _navManager
@@ -28,15 +26,16 @@
 }
 else
 {
-    <MudTable T="PayrollFrequencyDto"
-              @ref="_table"
-              Items="@PayrollList"
-              Hover="true"
-              RowsPerPage="10"
-              Filter="@(new Func<PayrollFrequencyDto, bool>(FilterFunc))">
+    <MudDataGrid T="PayrollFrequencyDto"
+                 @ref="_grid"
+                 Items="@PayrollList"
+                 Hover="true"
+                 Dense="true"
+                 SortMode="SortMode.Single"
+                 QuickFilter="@((Func<PayrollFrequencyDto, bool>)FilterFunc)"
+                 RowsPerPage="10">
 
         <ToolBarContent>
-            @*       <MudText Typo="Typo.h6">Frecuencias de Pago</MudText> *@
             <MudSpacer />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddDrawer">➕ Nueva</MudButton>
             <MudButton Variant="Variant.Outlined"
@@ -63,62 +62,44 @@ else
                           Style="width: 300px;" />
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="RefreshDataAsync" />
         </ToolBarContent>
-        <HeaderContent>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.Id">
-                    ID
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.Name">
-                    Nombre
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.Code">
-                    Código
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.DaysPerPeriod">
-                    Días/Período
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.PeriodsPerYear">
-                    Períodos/Año
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>
-                <MudTableSortLabel T="PayrollFrequencyDto" SortBy="x => x.IsActive">
-                    Estado
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>Acciones</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="ID">@context.Id</MudTd>
-            <MudTd DataLabel="Nombre">@context.Name</MudTd>
-            <MudTd DataLabel="Código">@context.Code</MudTd>
-            <MudTd DataLabel="Días/Período">@context.DaysPerPeriod</MudTd>
-            <MudTd DataLabel="Períodos/Año">@context.PeriodsPerYear</MudTd>
-            <MudTd DataLabel="Estado">
-                <span class="@(context.IsActive ? "badge-active" : "badge-inactive")">
-                    @(context.IsActive ? "Activo" : "Inactivo")
-                </span>
-            </MudTd>
-            <MudTd DataLabel="Acciones">
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDrawer(context))" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
-            </MudTd>
-        </RowTemplate>
+
+        <Columns>
+            <PropertyColumn Property="x => x.Id" Title="ID" />
+            <PropertyColumn Property="x => x.Name" Title="Nombre" />
+            <PropertyColumn Property="x => x.Code" Title="Código" />
+            <PropertyColumn Property="x => x.DaysPerPeriod" Title="Días/Período" />
+            <PropertyColumn Property="x => x.PeriodsPerYear" Title="Períodos/Año" />
+
+            <PropertyColumn Property="x => x.IsActive" Title="Estado">
+                <CellTemplate Context="cell">
+                    <span class="@(cell.Item.IsActive ? "badge-active" : "badge-inactive")">
+                        @(cell.Item.IsActive ? "Activo" : "Inactivo")
+                    </span>
+                </CellTemplate>
+            </PropertyColumn>
+
+            <PropertyColumn Property="x => x.Id" Title="Acciones" Sortable="false" Filterable="false">
+                <CellTemplate Context="cell">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(() => OpenEditDrawer(cell.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   OnClick="@(() => ConfirmDelete(cell.Item))" />
+                </CellTemplate>
+            </PropertyColumn>
+        </Columns>
+
         <NoRecordsContent>
             <div class="empty-state">No hay frecuencias registradas.</div>
         </NoRecordsContent>
+
         <PagerContent>
-            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+            <MudDataGridPager PageSizeOptions="new int[] { 10, 25, 50 }" />
         </PagerContent>
-    </MudTable>
+    </MudDataGrid>
 }
 
 
@@ -219,7 +200,7 @@ else
 @code {
     [Inject] private IJSRuntime JS { get; set; }
 
-    private MudTable<PayrollFrequencyDto>? _table;
+    private MudDataGrid<PayrollFrequencyDto>? _grid;
     private List<PayrollFrequencyDto> PayrollList = new();
     private MudForm? mudForm;
     private bool _drawerOpen;
@@ -229,7 +210,7 @@ else
     private bool _deleteDialogOpen;
     private PayrollFrequencyDto? _deleteTarget;
     private bool _isExporting = false;
-    
+
     private Dictionary<string, string> _fieldErrors = new(StringComparer.OrdinalIgnoreCase);
 
     private bool _loading = true;
@@ -248,14 +229,12 @@ else
     }
 
     protected override async Task OnInitializedAsync()
-{
-    _loading = true;
-    // Ahora esto SÍ funciona porque definiste [HttpGet("all")]
-    PayrollList = await Http.GetFromJsonAsync<List<PayrollFrequencyDto>>("api/payrollfrequencies/all");
-        // Orden inicial por ID ascendente
+    {
+        _loading = true;
+        PayrollList = await Http.GetFromJsonAsync<List<PayrollFrequencyDto>>("api/payrollfrequencies/all");
         PayrollList = PayrollList.OrderBy(x => x.Id).ToList();
-    _loading = false;
-}
+        _loading = false;
+    }
 
 
     private async Task RefreshDataAsync()
@@ -263,10 +242,7 @@ else
         _loading = true;
         try
         {
-            // Re-cargamos la lista completa desde el API
             PayrollList = await Http.GetFromJsonAsync<List<PayrollFrequencyDto>>("api/payrollfrequencies/all") ?? new();
-
-            // Esto fuerza a la tabla a renderizarse de nuevo con la nueva lista
             StateHasChanged();
         }
         catch (Exception ex)
@@ -347,16 +323,13 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add(_isEditing ? "Frecuencia actualizada" : "Frecuencia creada", Severity.Success);
-                // await _table!.ReloadServerData();
                 await RefreshTableData();
                 CloseDrawer();
                 return;
             }
 
-            // 2. MANEJO DE ERRORES DEL SERVIDOR
             if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
-                // ESTA ES LA CLAVE: Reseteamos la validación del MudForm antes de procesar errores del servidor
                 mudForm!.ResetValidation();
 
                 var jsonDoc = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
@@ -374,7 +347,6 @@ else
                         }
                     }
 
-                    // Forzamos la actualización de la UI
                     StateHasChanged();
                 }
             }
@@ -401,14 +373,11 @@ else
 
     private async Task RefreshTableData()
     {
-        // Vuelve a traer la lista completa desde tu endpoint /all
         var data = await Http.GetFromJsonAsync<List<PayrollFrequencyDto>>("api/payrollfrequencies/all");
 
         if (data != null)
         {
             PayrollList = data;
-            // Al actualizar PayrollList y llamar a StateHasChanged,
-            // la tabla se repinta y el filtro (FilterFunc) se aplica sobre la nueva lista.
             StateHasChanged();
         }
     }
@@ -421,7 +390,6 @@ else
         {
             await Http.DeleteAsync($"api/payrollfrequencies/{_deleteTarget.Id}");
             Snackbar.Add("Desactivado", Severity.Success);
-            // await _table!.ReloadServerData();
             await RefreshTableData();
             StateHasChanged();
         }
@@ -444,7 +412,7 @@ else
         mudForm?.ResetValidation();
     }
 
-    
+
 
     public class ValidationErrorResponse
     {
@@ -452,9 +420,6 @@ else
         public Dictionary<string, string[]> Errors { get; set; } = new();
     }
 
-    /// <summary>
-    /// ✅ Exporta a Excel usando HttpClient de Blazor (que ya tiene el token)
-    /// </summary>
     private async Task ExportToExcel()
     {
         _isExporting = true;
@@ -462,7 +427,6 @@ else
 
         try
         {
-            // ✅ 1. Usar el HttpClient de Blazor (YA TIENE EL TOKEN JWT)
             var response = await Http.GetAsync("api/reports/payroll-frequencies?format=Excel");
 
             if (!response.IsSuccessStatusCode)
@@ -472,13 +436,9 @@ else
                 return;
             }
 
-            // ✅ 2. Obtener los bytes del archivo Excel
             var bytes = await response.Content.ReadAsByteArrayAsync();
-
-            // ✅ 3. Convertir a Base64 para pasarlo a JavaScript
             var base64 = Convert.ToBase64String(bytes);
 
-            // ✅ 4. Descargar usando la función JS que YA TIENES en index.html
             var fileName = $"Frecuencias_Pago_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
             var mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -498,16 +458,12 @@ else
     }
 
 
-    // Esta función es la que MudTable usa internamente gracias a la propiedad Filter
     private bool FilterFunc(PayrollFrequencyDto element)
     {
         if (string.IsNullOrWhiteSpace(_searchString))
             return true;
 
         return element.Name?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true ||
-           element.Code?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true;
+               element.Code?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true;
     }
-
-  
 }
-

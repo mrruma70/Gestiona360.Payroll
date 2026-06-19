@@ -1,17 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Gestiona360.Payroll.Application.Contracts.DTOs;
+﻿using Gestiona360.Payroll.Domain.Entities;
+using Gestiona360.Payroll.Domain.Shared.Frontend;
 using MediatR;
 
-namespace Gestiona360.Payroll.Application.Features.Config.Queries
+namespace Gestiona360.Payroll.Application.Features.Config.Queries;
+
+public class GetGlobalConfigQuery : IRequest<GlobalConfigDto>
 {
-    public record GetGlobalConfigQuery(
-        int? YearINSS = null,
-        int? YearIR = null,
-        int? YearMitrab = null,
-        int? YearINATEC = null  
-    ) : IRequest<GlobalConfigDto>;
+    public int? YearINSS { get; }
+    public int? YearIR { get; }
+    public int? YearMitrab { get; }
+    public int? YearINATEC { get; }
+
+    public GetGlobalConfigQuery(int? yearINSS, int? yearIR, int? yearMitrab, int? yearINATEC)
+    {
+        YearINSS = yearINSS;
+        YearIR = yearIR;
+        YearMitrab = yearMitrab;
+        YearINATEC = yearINATEC;
+    }
 }

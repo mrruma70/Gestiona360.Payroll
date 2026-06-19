@@ -9,6 +9,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.8" />
+    <PackageReference Include="Scrutor" Version="7.0.0" />
+    <PackageReference Include="SqlKata" Version="4.0.1" />
   </ItemGroup>
 
   <ItemGroup>

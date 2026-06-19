@@ -1,18 +1,16 @@
 ﻿using FluentValidation;
 using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions;
-using Gestiona360.Payroll.Domain.Shared.Frontend;
-using Gestiona360.Payroll.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
+using Gestiona360.Payroll.Domain.Interfaces;
 
 namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
 {
     public class CreatePersonalActionValidator : AbstractValidator<CreatePersonalActionRequest>
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IPersonalActionValidationService _validationService;
 
-        public CreatePersonalActionValidator(ApplicationDbContext context)
+        public CreatePersonalActionValidator(IPersonalActionValidationService validationService)
         {
-            _context = context;
+            _validationService = validationService;
 
             // ==========================================================
             // REGLAS GENERALES (aplican a todas las acciones)
@@ -44,44 +42,16 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .GreaterThan(0)
                     .WithMessage("El nuevo salario debe ser mayor a 0.");
 
-                RuleFor(x => x.NewBaseSalary)
-                    .MustAsync(async (request, salary, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!salary.HasValue)
+                        if (!request.NewBaseSalary.HasValue)
                             return false;
 
-                        var employee = await _context.Employees
-                            .Include(e => e.JobGrade)
-                                .ThenInclude(jg => jg.JobPosition)
-                            .FirstOrDefaultAsync(
-                                e => e.Id == request.EmployeeId,
-                                ct);
-
-                        if (employee == null)
-                            return false;
-
-                        if (employee.JobGrade == null ||
-                            employee.JobGrade.JobPosition == null)
-                            return false;
-
-                        var minimumWageId =
-                            employee.JobGrade.JobPosition.MinimumWageId;
-
-                        // Si el puesto no tiene salario mínimo configurado
-                        if (!minimumWageId.HasValue)
-                            return true;
-
-                        var minimumWage = await _context.MinimumWages
-                            .FirstOrDefaultAsync(
-                                mw => mw.Id == minimumWageId.Value &&
-                                      mw.IsActive,
-                                ct);
-
-                        // Si no existe configuración, no bloquear
-                        if (minimumWage == null)
-                            return true;
-
-                        return salary.Value >= minimumWage.MonthlyAmountNIO;
+                        return await _validationService.IsSalaryAboveMinimumAsync(
+                            request.EmployeeId,
+                            request.NewBaseSalary.Value,
+                            ct);
                     })
                     .WithMessage("El nuevo salario no puede ser inferior al salario mínimo legal configurado para el puesto.");
             });
@@ -95,43 +65,23 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotNull()
                     .WithMessage("Debe seleccionar un nuevo puesto.");
 
-                // Validación de que el nuevo puesto sea diferente al actual
-                RuleFor(x => x.NewJobGradeId)
-                    .MustAsync(async (request, newJobGradeId, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!newJobGradeId.HasValue) return false;
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
-                        if (employee == null) return false;
-                        if (!employee.JobGradeId.HasValue) return true;
-                        return newJobGradeId.Value != employee.JobGradeId.Value;
+                        return await _validationService.IsNewJobGradeDifferentAsync(
+                            request.EmployeeId,
+                            request.NewJobGradeId,
+                            ct);
                     })
                     .WithMessage("El nuevo puesto debe ser diferente al actual.");
 
-                // Validación de salario mínimo del nuevo puesto
-                RuleFor(x => new { x.NewJobGradeId, x.EmployeeId })
-                    .MustAsync(async (obj, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!obj.NewJobGradeId.HasValue) return true;
-
-                        var employee = await _context.Employees
-                            .Include(e => e.JobGrade)
-                                .ThenInclude(jg => jg.JobPosition)
-                                    .ThenInclude(jp => jp.MinimumWage)
-                            .FirstOrDefaultAsync(e => e.Id == obj.EmployeeId, ct);
-                        if (employee == null) return true;
-
-                        var newJobGrade = await _context.JobGrades
-                            .Include(jg => jg.JobPosition)
-                                .ThenInclude(jp => jp.MinimumWage)
-                            .FirstOrDefaultAsync(jg => jg.Id == obj.NewJobGradeId, ct);
-                        if (newJobGrade == null) return true;
-
-                        var minimumWage = newJobGrade.JobPosition?.MinimumWage?.MonthlyAmountNIO;
-                        if (!minimumWage.HasValue) return true; // No hay mínimo definido, se permite
-
-                        // El salario actual del empleado no puede ser inferior al mínimo del nuevo puesto
-                        return employee.BaseSalary >= minimumWage.Value;
+                        return await _validationService.IsNewJobGradeSalaryValidAsync(
+                            request.EmployeeId,
+                            request.NewJobGradeId,
+                            ct);
                     })
                     .WithMessage("El salario actual del empleado es inferior al salario mínimo establecido para el nuevo puesto. Debe realizar un ajuste salarial primero.");
             });
@@ -145,18 +95,13 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotNull()
                     .WithMessage("Debe seleccionar un nuevo tipo de contrato.");
 
-                RuleFor(x => x.NewContractTypeId)
-                    .MustAsync(async (request, newContractTypeId, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!newContractTypeId.HasValue) return false;
-
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
-                        if (employee == null) return false;
-
-                        if (!employee.ContractTypeId.HasValue) return true;
-
-                        return newContractTypeId.Value != employee.ContractTypeId.Value;
+                        return await _validationService.IsNewContractTypeDifferentAsync(
+                            request.EmployeeId,
+                            request.NewContractTypeId,
+                            ct);
                     })
                     .WithMessage("El nuevo tipo de contrato debe ser diferente al actual.");
             });
@@ -170,19 +115,13 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotNull()
                     .WithMessage("Debe seleccionar un nuevo turno.");
 
-                RuleFor(x => x.NewShiftId)
-                    .MustAsync(async (request, newShiftId, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!newShiftId.HasValue) return false;
-
-                        var activeShift = await _context.EmployeeShiftAssignments
-                            .FirstOrDefaultAsync(sa => sa.EmployeeId == request.EmployeeId && sa.EndDate == null, ct);
-
-                        // Si el empleado NO tiene turno actual, cualquier turno es válido
-                        if (activeShift == null) return true;
-
-                        // Si tiene turno actual, debe ser diferente
-                        return newShiftId.Value != activeShift.ShiftId;
+                        return await _validationService.IsNewShiftDifferentAsync(
+                            request.EmployeeId,
+                            request.NewShiftId,
+                            ct);
                     })
                     .WithMessage("El nuevo turno debe ser diferente al turno actual del empleado.");
             });
@@ -196,18 +135,13 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotNull()
                     .WithMessage("Debe seleccionar un nuevo centro de costo.");
 
-                RuleFor(x => x.NewCostCenterId)
-                    .MustAsync(async (request, newCostCenterId, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!newCostCenterId.HasValue) return false;
-
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
-                        if (employee == null) return false;
-
-                        if (!employee.CostCenterId.HasValue) return true;
-
-                        return newCostCenterId.Value != employee.CostCenterId.Value;
+                        return await _validationService.IsNewCostCenterDifferentAsync(
+                            request.EmployeeId,
+                            request.NewCostCenterId,
+                            ct);
                     })
                     .WithMessage("El nuevo centro de costo debe ser diferente al actual.");
             });
@@ -221,18 +155,13 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotNull()
                     .WithMessage("Debe seleccionar un nuevo proveedor de salud.");
 
-                RuleFor(x => x.NewHealthProviderId)
-                    .MustAsync(async (request, newHealthProviderId, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (!newHealthProviderId.HasValue) return false;
-
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
-                        if (employee == null) return false;
-
-                        if (!employee.HealthProviderId.HasValue) return true;
-
-                        return newHealthProviderId.Value != employee.HealthProviderId.Value;
+                        return await _validationService.IsNewHealthProviderDifferentAsync(
+                            request.EmployeeId,
+                            request.NewHealthProviderId,
+                            ct);
                     })
                     .WithMessage("El nuevo proveedor de salud debe ser diferente al actual.");
             });
@@ -250,44 +179,32 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                     .NotEmpty()
                     .WithMessage("Debe ingresar el número de cuenta bancaria.");
 
-                RuleFor(x => x.NewBankAccountNumber)
-                    .MustAsync(async (request, newAccountNumber, ct) =>
+                RuleFor(x => x)
+                    .MustAsync(async (request, ct) =>
                     {
-                        if (string.IsNullOrWhiteSpace(newAccountNumber)) return false;
-
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, ct);
-                        if (employee == null) return false;
-
-                        // Si no tiene banco o cuenta anterior, cualquier combinación es válida
-                        if (!employee.BankId.HasValue || string.IsNullOrWhiteSpace(employee.BankAccountNumber))
-                            return true;
-
-                        // Debe cambiar al menos uno de los dos: banco o número de cuenta
-                        return request.NewBankId != employee.BankId ||
-                               newAccountNumber.Trim() != employee.BankAccountNumber.Trim();
+                        return await _validationService.IsNewBankAccountDifferentAsync(
+                            request.EmployeeId,
+                            request.NewBankId,
+                            request.NewBankAccountNumber,
+                            ct);
                     })
                     .WithMessage("El nuevo banco o número de cuenta debe ser diferente al actual.");
             });
 
             // ==========================================================
-            // SUSPENSION - Suspensión (reglas consolidadas)
+            // SUSPENSION - Suspensión
             // ==========================================================
             When(x => x.ActionType == "Suspension", () =>
             {
-                // Validación de fechas
                 RuleFor(x => x.EndDate)
                     .GreaterThan(x => x.EffectiveDate)
                     .When(x => x.EndDate.HasValue)
                     .WithMessage("La fecha de fin debe ser posterior a la fecha de inicio.");
 
-                // Validación de suspensión activa
                 RuleFor(x => x.EmployeeId)
                     .MustAsync(async (employeeId, ct) =>
                     {
-                        var activeSuspension = await _context.EmployeeSuspensions
-                            .FirstOrDefaultAsync(s => s.EmployeeId == employeeId && s.EndDate == null, ct);
-                        return activeSuspension == null;
+                        return await _validationService.HasNoActiveSuspensionAsync(employeeId, ct);
                     })
                     .WithMessage("El empleado ya tiene una suspensión activa. No se puede crear otra.");
             });
@@ -300,32 +217,24 @@ namespace Gestiona360.Payroll.Application.Features.PersonalActions.Commands
                 RuleFor(x => x.EmployeeId)
                     .MustAsync(async (employeeId, ct) =>
                     {
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
-                        return employee != null && employee.EmploymentStatus == EmploymentStatus.Suspended;
+                        return await _validationService.IsEmployeeSuspendedAsync(employeeId, ct);
                     })
                     .WithMessage("Solo se puede reincorporar a un empleado que esté en estado Suspendido.");
             });
 
             // ==========================================================
-            // TERMINATION - Terminación (reglas consolidadas)
+            // TERMINATION - Terminación
             // ==========================================================
             When(x => x.ActionType == "Termination", () =>
             {
-                // Validación de justificación
                 RuleFor(x => x.IsJustified)
                     .NotNull()
                     .WithMessage("Debe indicar si la terminación es justificada.");
 
-                // Validación de estado del empleado
                 RuleFor(x => x.EmployeeId)
                     .MustAsync(async (employeeId, ct) =>
                     {
-                        var employee = await _context.Employees
-                            .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
-                        return employee != null &&
-                               (employee.EmploymentStatus == EmploymentStatus.Active ||
-                                employee.EmploymentStatus == EmploymentStatus.Suspended);
+                        return await _validationService.CanBeTerminatedAsync(employeeId, ct);
                     })
                     .WithMessage("La terminación solo puede aplicarse a empleados Activos o Suspendidos (no terminados).");
             });

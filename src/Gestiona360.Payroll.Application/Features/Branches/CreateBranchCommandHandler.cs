@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Gestiona360.Payroll.Application.Abstractions.Repositories;
 using Gestiona360.Payroll.Domain.Entities;
+using Gestiona360.Payroll.Domain.Services;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,35 +14,29 @@ namespace Gestiona360.Payroll.Application.Features.Branches
 {
     public class CreateBranchCommandHandler : IRequestHandler<CreateBranchCommand, Guid>
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly BranchDomainService _domainService;
 
-        public CreateBranchCommandHandler(ApplicationDbContext context)
+        public CreateBranchCommandHandler(
+            IUnitOfWork unitOfWork,
+            BranchDomainService domainService)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
+            _domainService = domainService;
         }
 
         public async Task<Guid> Handle(CreateBranchCommand command, CancellationToken cancellationToken)
         {
             var request = command.Request;
 
-            // Validar código único
-            var existsCode = await _context.Branches
-                .AnyAsync(b => b.Code == request.Code, cancellationToken);
+            // 1. Validar código único
+            await _domainService.ValidateCodeIsUniqueAsync(request.Code, cancellationToken);
 
-            if (existsCode)
-                throw new InvalidOperationException($"Ya existe una sucursal con el código '{request.Code}'.");
-
-            // Validar que la empresa existe
-            var companyExists = await _context.Companies
-                .AnyAsync(c => c.Id == request.CompanyId, cancellationToken);
-
-            if (!companyExists)
-                throw new InvalidOperationException($"La empresa con ID '{request.CompanyId}' no existe.");
-
+            // 2. Crear entidad
             var branch = new Branch
             {
                 Id = Guid.NewGuid(),
-                Code = request.Code.ToUpper(),
+                Code = request.Code.ToUpper().Trim(),
                 Name = request.Name.Trim(),
                 Address = request.Address.Trim(),
                 City = request.City.Trim(),
@@ -53,11 +49,13 @@ namespace Gestiona360.Payroll.Application.Features.Branches
                 CreatedAt = DateTime.UtcNow
             };
 
-            _context.Branches.Add(branch);
-            await _context.SaveChangesAsync(cancellationToken);
+            // 3. Persistir
+            await _unitOfWork.Branches.AddAsync(branch, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return branch.Id;
         }
+
     }
 
 }

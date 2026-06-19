@@ -1,48 +1,39 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// src/Gestiona360.Payroll.Application/Features/Employees/Queries/GenerateEmployeeCredentialQueryHandler.cs
+
 using Gestiona360.Payroll.Application.Features.Employees.Reports;
 using Gestiona360.Payroll.Application.Services;
-using Gestiona360.Payroll.Infrastructure.Persistence;
+using Gestiona360.Payroll.Domain.Entities;
+using Gestiona360.Payroll.Domain.Exceptions;
+using Gestiona360.Payroll.Domain.Interfaces;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 
-namespace Gestiona360.Payroll.Application.Features.Employees.Queries
+namespace Gestiona360.Payroll.Application.Features.Employees.Queries;
+
+/// <summary>
+/// Handler para generar el PDF de credencial tipo carnet.
+/// </summary>
+public class GenerateEmployeeCredentialQueryHandler : IRequestHandler<GenerateEmployeeCredentialQuery, byte[]>
 {
-    /// <summary>
-    /// Handler para generar el PDF de credencial tipo carnet.
-    /// </summary>
-    public class GenerateEmployeeCredentialQueryHandler : IRequestHandler<GenerateEmployeeCredentialQuery, byte[]>
+    private readonly IEmployeeRepository _employeeRepository;
+    private readonly EmployeeBarcodeService _barcodeService;
+
+    public GenerateEmployeeCredentialQueryHandler(
+        IEmployeeRepository employeeRepository,
+        EmployeeBarcodeService barcodeService)
     {
-        private readonly ApplicationDbContext _context;
-        private readonly EmployeeBarcodeService _barcodeService;
+        _employeeRepository = employeeRepository ?? throw new ArgumentNullException(nameof(employeeRepository));
+        _barcodeService = barcodeService ?? throw new ArgumentNullException(nameof(barcodeService));
+    }
 
-        public GenerateEmployeeCredentialQueryHandler(
-            ApplicationDbContext context,
-            EmployeeBarcodeService barcodeService)
-        {
-            _context = context;
-            _barcodeService = barcodeService;
-        }
+    public async Task<byte[]> Handle(GenerateEmployeeCredentialQuery request, CancellationToken cancellationToken)
+    {
+        var employee = await _employeeRepository.GetEmployeeForCredentialAsync(request.EmployeeId, cancellationToken);
 
-        public async Task<byte[]> Handle(GenerateEmployeeCredentialQuery request, CancellationToken cancellationToken)
-        {
-            var employee = await _context.Employees
-                .Include(e => e.Company)
-                .Include(e => e.Branch)
-                .Include(e => e.JobGrade)
-                    .ThenInclude(jg => jg!.JobPosition)
-                .Include(e => e.PayrollGroup)
-                .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, cancellationToken);
+        if (employee == null)
+            throw new NotFoundException(nameof(Employee), request.EmployeeId);
 
-            if (employee == null)
-                throw new KeyNotFoundException("Empleado no encontrado.");
-
-            var document = new EmployeeCredentialDocument(employee, request.WebRootPath, _barcodeService);
-            return document.GeneratePdf();
-        }
+        var document = new EmployeeCredentialDocument(employee, request.WebRootPath, _barcodeService);
+        return document.GeneratePdf();
     }
 }

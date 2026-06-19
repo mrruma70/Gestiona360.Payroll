@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Gestiona360.Payroll.Application.Abstractions.Repositories;
 using Gestiona360.Payroll.Domain.Entities;
+using Gestiona360.Payroll.Domain.Services;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,51 +14,45 @@ namespace Gestiona360.Payroll.Application.Features.INATECConfigs.Commands
 {
     public class CreateNewINATECValidityCommandHandler : IRequestHandler<CreateNewINATECValidityCommand, Unit>
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly InatecConfigDomainService _domainService;
 
-        public CreateNewINATECValidityCommandHandler(ApplicationDbContext context) => _context = context;
+        public CreateNewINATECValidityCommandHandler(
+            IUnitOfWork unitOfWork,
+            InatecConfigDomainService domainService)
+        {
+            _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+            _domainService = domainService ?? throw new ArgumentNullException(nameof(domainService));
+        }
 
         public async Task<Unit> Handle(CreateNewINATECValidityCommand request, CancellationToken ct)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync(ct);
-            try
+            // 1. Validar y cerrar configuración actual (si existe)
+            var currentConfig = await _domainService.ValidateAndCloseCurrentAsync(request.EffectiveFrom, ct);
+
+            if (currentConfig != null)
             {
-                var currentConfig = await _context.INATECConfigs
-                    .Where(c => c.EffectiveTo == null && c.IsActive)
-                    .OrderByDescending(c => c.EffectiveFrom)
-                    .FirstOrDefaultAsync(ct);
-
-                if (currentConfig != null)
-                {
-                    if (request.EffectiveFrom <= currentConfig.EffectiveFrom)
-                        throw new InvalidOperationException("La fecha de inicio debe ser posterior a la vigencia actual.");
-
-                    currentConfig.EffectiveTo = request.EffectiveFrom.AddDays(-1);
-                    currentConfig.UpdatedAt = DateTime.UtcNow;
-                }
-
-                var newConfig = new INATECConfig
-                {
-                    EffectiveFrom = request.EffectiveFrom,
-                    EffectiveTo = null,
-                    LegalReference = request.LegalReference,
-                    Rate = request.Rate,
-                    Exceptions = request.Exceptions,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _context.INATECConfigs.Add(newConfig);
-                await _context.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-
-                return Unit.Value;
+                _unitOfWork.InatecConfigs.UpdateConfig(currentConfig);
             }
-            catch
+
+            // 2. Crear nueva configuración
+            var newConfig = new INATECConfig
             {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+                EffectiveFrom = request.EffectiveFrom,
+                EffectiveTo = null,
+                LegalReference = request.LegalReference,
+                Rate = request.Rate,
+                Exceptions = request.Exceptions,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.InatecConfigs.CreateConfigAsync(newConfig, ct);
+
+            // 3. Persistir
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Unit.Value;
         }
     }
 }

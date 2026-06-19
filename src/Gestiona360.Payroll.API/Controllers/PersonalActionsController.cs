@@ -1,6 +1,7 @@
 ﻿using Gestiona360.Payroll.Application.Contracts.DTOs.PersonalActions;
 using Gestiona360.Payroll.Application.Features.PersonalActions.Commands;
 using Gestiona360.Payroll.Application.Features.PersonalActions.Queries;
+using Gestiona360.Payroll.Domain.Shared.Frontend;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

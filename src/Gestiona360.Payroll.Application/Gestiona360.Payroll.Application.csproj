@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Folder Include="Common\" />
+    <Folder Include="Features\Employees\Exports\" />
   </ItemGroup>
 
   <PropertyGroup>

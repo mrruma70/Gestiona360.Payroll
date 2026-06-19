@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Gestiona360.Payroll.Domain.Entities;
+using Gestiona360.Payroll.Domain.Interfaces;
 using Gestiona360.Payroll.Domain.Shared.Frontend;
 using Gestiona360.Payroll.Domain.Shared.Frontend.Enums;
 

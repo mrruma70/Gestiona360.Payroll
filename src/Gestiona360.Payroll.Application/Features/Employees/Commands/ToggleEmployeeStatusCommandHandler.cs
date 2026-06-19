@@ -1,30 +1,33 @@
-﻿using Gestiona360.Payroll.Infrastructure.Persistence;
+﻿// src/Gestiona360.Payroll.Application/Features/Employees/Commands/ToggleEmployeeStatusCommandHandler.cs
+
+using Gestiona360.Payroll.Application.Abstractions.Repositories;
+using Gestiona360.Payroll.Domain.Interfaces;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Gestiona360.Payroll.Application.Features.Employees.Commands;
 
 public class ToggleEmployeeStatusCommandHandler : IRequestHandler<ToggleEmployeeStatusCommand, Unit>
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public ToggleEmployeeStatusCommandHandler(ApplicationDbContext context)
+    public ToggleEmployeeStatusCommandHandler(IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Unit> Handle(ToggleEmployeeStatusCommand request, CancellationToken cancellationToken)
     {
-        var employee = await _context.Employees.FindAsync(new object[] { request.EmployeeId }, cancellationToken);
+        var employee = await _unitOfWork.Employees.GetByIdAsync(request.EmployeeId);
 
         if (employee == null)
-            throw new KeyNotFoundException("Empleado no encontrado.");
+            throw new KeyNotFoundException($"No se encontró el empleado con ID {request.EmployeeId}.");
 
         // Invertir el estado
         employee.IsActive = !employee.IsActive;
         employee.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        _unitOfWork.Employees.Update(employee);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Unit.Value;
     }

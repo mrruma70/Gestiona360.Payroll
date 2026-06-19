@@ -3,46 +3,68 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Gestiona360.Payroll.Application.Abstractions.Repositories;
+using Gestiona360.Payroll.Domain.Exceptions;
+using Gestiona360.Payroll.Domain.Services;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Gestiona360.Payroll.Application.Features.Companies.Commands
 {
+
     public class UpdateCompanyCommandHandler : IRequestHandler<UpdateCompanyCommand, Unit>
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly CompanyDomainService _domainService;
 
-        public UpdateCompanyCommandHandler(ApplicationDbContext context) => _context = context;
-
-        public async Task<Unit> Handle(UpdateCompanyCommand request, CancellationToken cancellationToken)
+        public UpdateCompanyCommandHandler(
+            IUnitOfWork unitOfWork,
+            CompanyDomainService domainService)
         {
-            var company = await _context.Companies
-                .FirstOrDefaultAsync(c => c.Id == request.Request.Id, cancellationToken);
+            _unitOfWork = unitOfWork;
+            _domainService = domainService;
+        }
 
-            if (company == null) throw new InvalidOperationException("Empresa no encontrada");
+        public async Task<Unit> Handle(UpdateCompanyCommand command, CancellationToken cancellationToken)
+        {
+            var request = command.Request;
 
-            // Mapeo de campos editables
-            company.LegalName = request.Request.LegalName;
-            company.CommercialName = request.Request.CommercialName;
-            company.TaxId = request.Request.TaxId;
-            company.INSSEmployerCode = request.Request.INSSEmployerCode;
-            company.EconomicActivityCode = request.Request.EconomicActivityCode;
-            company.Phone = request.Request.Phone;
-            company.Email = request.Request.Email;
-            company.Address = request.Request.Address;
-            company.City = request.Request.City;
-            company.Department = request.Request.Department;
-            company.LogoUrl = request.Request.LogoUrl;
-            company.LegalRepresentative = request.Request.LegalRepresentative;
-            company.LegalRepresentativeId = request.Request.LegalRepresentativeId;
-            company.DefaultCurrency = request.Request.DefaultCurrency;
-            company.DefaultPayrollFrequencyId = request.Request.DefaultPayrollFrequencyId;
-            company.DefaultIsZoneFranca = request.Request.DefaultIsZoneFranca;
+            // 1. Obtener empresa
+            var company = await _unitOfWork.Companies.GetByIdAsync(request.Id, cancellationToken)
+                ?? throw new NotFoundException("Company", request.Id);
+
+            // 2. Validar RUC único (si cambió)
+            if (company.TaxId != request.TaxId)
+            {
+                await _domainService.ValidateTaxIdIsUniqueAsync(request.TaxId, request.Id, cancellationToken);
+            }
+
+            // 3. Actualizar campos
+            company.LegalName = request.LegalName.Trim();
+            company.CommercialName = request.CommercialName?.Trim();
+            company.TaxId = request.TaxId.Trim();
+            company.INSSEmployerCode = request.INSSEmployerCode?.Trim();
+            company.EconomicActivityCode = request.EconomicActivityCode?.Trim();
+            company.Phone = request.Phone?.Trim();
+            company.Email = request.Email?.Trim();
+            company.Address = request.Address?.Trim();
+            company.City = request.City?.Trim();
+            company.Department = request.Department?.Trim();
+            company.LogoUrl = request.LogoUrl;
+            company.LegalRepresentative = request.LegalRepresentative?.Trim();
+            company.LegalRepresentativeId = request.LegalRepresentativeId;
+            company.DefaultCurrency = request.DefaultCurrency;
+            company.DefaultPayrollFrequencyId = request.DefaultPayrollFrequencyId;
+            company.DefaultIsZoneFranca = request.DefaultIsZoneFranca;
             company.UpdatedAt = DateTime.UtcNow;
-       
-            await _context.SaveChangesAsync(cancellationToken);
+
+            // 4. Persistir
+            _unitOfWork.Companies.Update(company);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
             return Unit.Value;
         }
     }
+
 }

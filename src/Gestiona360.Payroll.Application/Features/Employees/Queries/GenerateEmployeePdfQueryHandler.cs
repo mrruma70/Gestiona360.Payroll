@@ -1,40 +1,28 @@
-﻿using Gestiona360.Payroll.Application.Features.Employees.Reports;
-using Gestiona360.Payroll.Infrastructure.Persistence;
+﻿// src/Gestiona360.Payroll.Application/Features/Employees/Queries/GenerateEmployeePdfQueryHandler.cs
+
+using Gestiona360.Payroll.Application.Features.Employees.Reports;
+using Gestiona360.Payroll.Domain.Interfaces;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 
 namespace Gestiona360.Payroll.Application.Features.Employees.Queries;
 
 public class GenerateEmployeePdfQueryHandler : IRequestHandler<GenerateEmployeePdfQuery, byte[]>
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IEmployeeRepository _employeeRepository;
 
-    public GenerateEmployeePdfQueryHandler(ApplicationDbContext context)
+    public GenerateEmployeePdfQueryHandler(IEmployeeRepository employeeRepository)
     {
-        _context = context;
+        _employeeRepository = employeeRepository;
     }
 
     public async Task<byte[]> Handle(GenerateEmployeePdfQuery request, CancellationToken cancellationToken)
     {
-        var employee = await _context.Employees
-            .Include(e => e.Company)
-            .Include(e => e.Branch)
-            .Include(e => e.CostCenter)
-            .Include(e => e.ContractType)
-            .Include(e => e.JobGrade).ThenInclude(jg => jg!.JobPosition)
-            .Include(e => e.Bank)
-            .Include(e => e.HealthProvider)
-            .Include(e => e.OccupationalRisk)
-             .Include(e => e.PayrollGroup)
-              .Include(e => e.Department)         
-                .Include(e => e.Municipality)     
-            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId, cancellationToken);
+        var employee = await _employeeRepository.GetEmployeeWithFullDetailsAsync(request.EmployeeId, cancellationToken);
 
         if (employee == null)
-            throw new KeyNotFoundException("Empleado no encontrado.");
+            throw new KeyNotFoundException($"No se encontró el empleado con ID {request.EmployeeId}.");
 
-        // ✅ Aquí usa request.WebRootPath
         var document = new EmployeeFichaDocument(employee, request.WebRootPath);
         return document.GeneratePdf();
     }

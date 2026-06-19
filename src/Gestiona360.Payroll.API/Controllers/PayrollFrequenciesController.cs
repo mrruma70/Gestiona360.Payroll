@@ -1,6 +1,7 @@
 ﻿using Gestiona360.Payroll.API.Contracts.Common;
 using Gestiona360.Payroll.Application.Contracts.DTOs;
 using Gestiona360.Payroll.Application.Features.PayrollFrequency;
+using Gestiona360.Payroll.Application.Features.PayrollGroups.Queries;
 using Gestiona360.Payroll.Application.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

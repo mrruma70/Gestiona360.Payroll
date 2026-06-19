@@ -1,47 +1,43 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Gestiona360.Payroll.Infrastructure.Persistence;
+﻿// src/Gestiona360.Payroll.Application/Features/Branches/Commands/DeleteBranchCommandHandler.cs
+
+using Gestiona360.Payroll.Application.Abstractions.Repositories;
+using Gestiona360.Payroll.Domain.Exceptions;
+using Gestiona360.Payroll.Domain.Interfaces;
+using Gestiona360.Payroll.Domain.Services;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
-namespace Gestiona360.Payroll.Application.Features.Branches
+namespace Gestiona360.Payroll.Application.Features.Branches.Commands;
+
+public class DeleteBranchCommandHandler : IRequestHandler<DeleteBranchCommand, Unit>
 {
-    public class DeleteBranchCommandHandler : IRequestHandler<DeleteBranchCommand, Unit>
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly BranchDomainService _domainService;
+
+    public DeleteBranchCommandHandler(
+        IUnitOfWork unitOfWork,
+        BranchDomainService domainService)
     {
-        private readonly ApplicationDbContext _context;
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _domainService = domainService ?? throw new ArgumentNullException(nameof(domainService));
+    }
 
-        public DeleteBranchCommandHandler(ApplicationDbContext context)
-        {
-            _context = context;
-        }
+    public async Task<Unit> Handle(DeleteBranchCommand command, CancellationToken cancellationToken)
+    {
+        // 1. Obtener sucursal
+        var branch = await _unitOfWork.Branches.GetByIdAsync(command.Id, cancellationToken)
+            ?? throw new NotFoundException("Branch", command.Id);
 
-        public async Task<Unit> Handle(DeleteBranchCommand command, CancellationToken cancellationToken)
-        {
-            var branch = await _context.Branches
-                .FirstOrDefaultAsync(b => b.Id == command.Id, cancellationToken);
+        // 2. Validar que no tenga empleados activos
+        await _domainService.ValidateCanDeactivateAsync(command.Id, branch.Name, cancellationToken);
 
-            if (branch == null)
-                throw new KeyNotFoundException($"No se encontró la sucursal con ID '{command.Id}'.");
+        // 3. Baja lógica (no eliminar físicamente)
+        branch.IsActive = false;
+        branch.UpdatedAt = DateTime.UtcNow;
 
-            // Verificar si tiene empleados asignados
-            var hasEmployees = await _context.Employees
-                .AnyAsync(e => e.BranchId == command.Id && e.IsActive, cancellationToken);
+        // 4. Persistir
+        _unitOfWork.Branches.Update(branch);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (hasEmployees)
-                throw new InvalidOperationException(
-                    $"No se puede desactivar la sucursal '{branch.Name}' porque tiene empleados activos asignados.");
-
-            // Baja lógica (no eliminar físicamente)
-            branch.IsActive = false;
-            branch.UpdatedAt = DateTime.UtcNow;
-
-            _context.Branches.Update(branch);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            return Unit.Value;
-        }
+        return Unit.Value;
     }
 }
