@@ -12,7 +12,7 @@ namespace Gestiona360.Payroll.Domain.Common
         public DateTime? UpdatedAt { get; set; }
 
         public Guid CreatedBy { get; set; }
-    
+
         public Guid? UpdatedBy { get; set; }
 
         public DateTime? DeletedAt { get; set; }
@@ -24,5 +24,22 @@ namespace Gestiona360.Payroll.Domain.Common
         public byte[] RowVersion { get; set; } // Concurrencia optimista
 
         public bool IsActive { get; set; }
+    
+
+     // ✅ Métodos de dominio para auditoría
+        public void MarkAsDeleted(Guid deletedBy)
+        {
+            if (IsDeleted) return;
+
+            DeletedAt = DateTime.UtcNow;
+            DeletedBy = deletedBy;
+            IsDeleted = true;
+        }
+
+        public void UpdateAudit(Guid updatedBy)
+        {
+            UpdatedAt = DateTime.UtcNow;
+            UpdatedBy = updatedBy;
+        }
     }
 }

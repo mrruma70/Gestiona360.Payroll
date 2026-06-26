@@ -1,6 +1,8 @@
 ﻿using FluentValidation;
 using Gestiona360.Payroll.Application.Contracts.Reports;
 using Gestiona360.Payroll.Application.Contracts.Services;
+using Gestiona360.Payroll.Application.Features.PersonalActions.Commands.ExecutePersonalAction;
+using Gestiona360.Payroll.Application.Features.PersonalActions.Strategies;
 using Gestiona360.Payroll.Application.Pipeline;
 using Gestiona360.Payroll.Application.Services;
 using Gestiona360.Payroll.Domain.Interfaces;
@@ -29,7 +31,7 @@ namespace Gestiona360.Payroll.Application
             // Registro automático de todas las estrategias de acciones
             // Esto reemplaza el servicio monolítico PersonalActionExecutionService
             services.Scan(scan => scan
-             .FromAssemblyOf<IPersonalActionStrategy>()
+             .FromAssemblyOf<ExecutePersonalActionCommandHandler>()
              .AddClasses(classes => classes
                  .AssignableToAny(typeof(IPersonalActionStrategy), typeof(IPayrollService))
              )

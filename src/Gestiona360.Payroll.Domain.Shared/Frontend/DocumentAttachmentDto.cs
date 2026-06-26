@@ -28,5 +28,11 @@ namespace Gestiona360.Payroll.Domain.Shared.Frontend
 
         /// <summary>Indica si el documento es obligatorio</summary>
         public bool IsRequired { get; set; }
+
+        /// <summary>
+        /// Tipo/categoría del documento (ej: "Carta de Aumento Salarial Firmada").
+        /// Se usa para hacer match con los documentos requeridos en la UI.
+        /// </summary>
+        public string? DocumentType { get; set; }
     }
 }

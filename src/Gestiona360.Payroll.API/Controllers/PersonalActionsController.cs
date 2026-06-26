@@ -99,6 +99,44 @@ public class PersonalActionsController : ControllerBase
     }
 
     /// <summary>
+    /// Actualiza una Acción de Personal existente (solo en estado Borrador).
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePersonalAction(Guid id, [FromBody] UpdatePersonalActionDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        if (id != dto.Id)
+            return BadRequest("El ID de la ruta no coincide con el ID del cuerpo.");
+
+        var command = new UpdatePersonalActionCommand(id, dto);
+        var actionId = await _mediator.Send(command);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Obtiene el detalle de una Acción de Personal por ID.
+    /// </summary>
+    //[HttpGet("{id:guid}")]
+    //[ProducesResponseType(typeof(PersonalActionDetailDto), StatusCodes.Status200OK)]
+    //[ProducesResponseType(StatusCodes.Status404NotFound)]
+    //public async Task<IActionResult> GetPersonalActionDetail(Guid id)
+    //{
+    //    var query = new GetPersonalActionDetailQuery(id);
+    //    var result = await _mediator.Send(query);
+
+    //    if (result == null)
+    //        return NotFound();
+
+    //    return Ok(result);
+    //}
+
+    /// <summary>
     /// Ejecuta una Acción de Personal, aplicando los cambios a las tablas maestras.
     /// </summary>
     [HttpPost("{id:guid}/execute")]

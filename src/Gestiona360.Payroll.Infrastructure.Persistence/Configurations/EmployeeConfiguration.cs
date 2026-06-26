@@ -16,6 +16,9 @@ namespace Gestiona360.Payroll.Infrastructure.Persistence.Configurations
             builder.HasIndex(e => e.Identification).IsUnique();
             builder.HasIndex(e => e.Email);
             builder.HasIndex(e => new { e.CompanyId, e.BranchId });
+            builder.HasIndex(e => new { e.IsActive, e.CompanyId });
+            builder.HasIndex(e => new { e.PayrollGroupId });
+            builder.HasIndex(e => new { e.EmploymentStatus });
 
             // Propiedades
             builder.Property(e => e.Identification).IsRequired().HasMaxLength(20);

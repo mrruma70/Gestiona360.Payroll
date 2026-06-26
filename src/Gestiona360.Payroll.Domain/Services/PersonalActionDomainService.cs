@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using Gestiona360.Payroll.Domain.Entities;
 using Gestiona360.Payroll.Domain.Exceptions;
 using Gestiona360.Payroll.Domain.Interfaces;
 using Gestiona360.Payroll.Domain.Shared.Frontend;
 using Gestiona360.Payroll.Domain.Shared.Frontend.Enums;
+
 
 namespace Gestiona360.Payroll.Domain.Services
 {
@@ -329,6 +327,113 @@ namespace Gestiona360.Payroll.Domain.Services
             action.ExecutedDate = DateTime.UtcNow;
 
             _repository.Update(action);
+        }
+
+        public async Task<PersonalAction> UpdatePersonalActionAsync(
+       PersonalActionUpdateData data,
+       PersonalAction existingAction,
+       CancellationToken cancellationToken)
+        {
+            // 1. Obtener empleado para validaciones
+            var employee = await _employeeRepository.GetByIdAsync(existingAction.EmployeeId, cancellationToken)
+                ?? throw new NotFoundException("Empleado", existingAction.EmployeeId);
+
+            // 2. Validar período de nómina para la nueva fecha de efecto
+            var targetPeriod = await _payrollPeriodRepository.GetPeriodByDateAndPayrollGroupAsync(
+                employee.PayrollGroupId,
+                data.EffectiveDate,
+                cancellationToken);
+
+            if (targetPeriod == null)
+                throw new BusinessRuleViolationException(
+                    $"No existe un período de nómina configurado para la fecha {data.EffectiveDate:dd/MM/yyyy} en el grupo del empleado.");
+
+            if (targetPeriod.Status != "Open")
+                throw new BusinessRuleViolationException(
+                    $"No se pueden actualizar acciones porque el período '{targetPeriod.PeriodNumber}' está en estado '{targetPeriod.Status}'.");
+
+            // 3. Actualizar campos editables
+            existingAction.EffectiveDate = data.EffectiveDate;
+            existingAction.CausalDescription = data.CausalDescription;
+            existingAction.Justification = data.Justification;
+            existingAction.TargetPayrollPeriodId = targetPeriod.Id;
+
+            // 4. Actualizar campos específicos según el tipo de acción
+            switch (existingAction.ActionType)
+            {
+                case ActionType.SalaryChange:
+                    existingAction.NewBaseSalary = data.NewBaseSalary;
+                    break;
+                case ActionType.PositionChange:
+                    existingAction.NewJobGradeId = data.NewJobGradeId;
+                    existingAction.NewBaseSalary = data.NewBaseSalary;
+                    break;
+                case ActionType.ContractChange:
+                    existingAction.NewContractTypeId = data.NewContractTypeId;
+                    break;
+                case ActionType.ShiftChange:
+                    existingAction.NewShiftId = data.NewShiftId;
+                    break;
+                case ActionType.CostCenterChange:
+                    existingAction.NewCostCenterId = data.NewCostCenterId;
+                    break;
+                case ActionType.HealthProviderChange:
+                    existingAction.NewHealthProviderId = data.NewHealthProviderId;
+                    break;
+                case ActionType.BankAccountChange:
+                    existingAction.NewBankId = data.NewBankId;
+                    existingAction.NewBankAccountNumber = data.NewBankAccountNumber;
+                    break;
+                case ActionType.Suspension:
+                    // Campos específicos de suspensión si los tienes
+                    break;
+                case ActionType.Termination:
+                    // Campos específicos de terminación si los tienes
+                    break;
+                case ActionType.Reinstatement:
+                    // Campos específicos de reincorporación si los tienes
+                    break;
+            }
+
+            // 5. Actualizar documentos (serializar como JSON string)
+            if (data.Documents != null && data.Documents.Any())
+            {
+                existingAction.DocumentAttachments = JsonSerializer.Serialize(data.Documents);
+            }
+            else
+            {
+                existingAction.DocumentAttachments = "[]";
+            }
+
+            // 6. Validar reglas de negocio
+            ValidateBusinessRulesForUpdate(existingAction);
+
+            // 7. Actualizar metadata
+            existingAction.UpdatedAt = DateTime.UtcNow;
+
+            // 8. Actualizar en el repositorio
+            _repository.Update(existingAction);
+
+            return existingAction;
+        }
+
+        /// <summary>
+        /// Valida las reglas de negocio para la actualización de acción.
+        /// </summary>
+        private static void ValidateBusinessRulesForUpdate(PersonalAction action)
+        {
+            // Validar justificación
+            if (string.IsNullOrWhiteSpace(action.Justification) || action.Justification.Length < 20)
+                throw new BusinessRuleViolationException("La justificación debe tener al menos 20 caracteres.");
+
+            // Validar salario (si aplica)
+            if (action.ActionType == ActionType.SalaryChange && action.NewBaseSalary.HasValue)
+            {
+                if (action.NewBaseSalary.Value <= 0)
+                    throw new BusinessRuleViolationException("El nuevo salario debe ser mayor a cero.");
+            }
+
+           
         }
 
     }

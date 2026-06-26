@@ -1,4 +1,5 @@
 ﻿using Gestiona360.Payroll.Application.Contracts.DTOs;
+using Gestiona360.Payroll.Domain.Shared.Frontend;
 using Gestiona360.Payroll.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Gestiona360.Payroll.Application.Contracts.DTOs.Employees
+namespace Gestiona360.Payroll.Domain.Shared.Frontend
 {
     public class JobGradeDto
     {
